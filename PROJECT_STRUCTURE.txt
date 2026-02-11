@@ -1,0 +1,170 @@
+FPGA AI Design Bot - Project Structure
+========================================
+
+fpga_ai_bot/
+│
+├── main.py                      # CLI entry point and orchestration
+├── config.py                    # Configuration and API settings
+├── llm_router.py               # Groq API integration and routing
+├── toolchain.py                # FPGA toolchain validation (Yosys, Verilator)
+├── stage_controller.py         # Stage orchestration engine
+│
+├── roles/                      # AI role implementations
+│   ├── __init__.py            # Package initialization
+│   ├── hod.py                 # Head of Design (controller/gatekeeper)
+│   ├── architecture.py        # Architecture designer (blocks, FSMs)
+│   ├── rtl.py                 # RTL generator (Verilog code)
+│   ├── verification.py        # Verification engineer (audit/fix)
+│   └── system_role.py         # System engineer (feasibility)
+│
+├── prompts/                    # Prompt templates for each role
+│   ├── hod.txt                # HOD role prompt
+│   ├── arch.txt               # Architecture role prompt
+│   ├── rtl.txt                # RTL role prompt
+│   ├── verify.txt             # Verification role prompt
+│   └── system.txt             # System role prompt
+│
+├── examples/                   # Example design specifications
+│   ├── sample_spec.json       # UART transmitter example
+│   └── spi_master_spec.json   # SPI master example
+│
+├── outputs/                    # Generated outputs (created at runtime)
+│   └── YYYYMMDD_HHMMSS/       # Timestamped session directories
+│       ├── stage0_validation.json
+│       ├── stage1_requirements.json
+│       ├── stage2_architecture.json
+│       ├── stage3_approval.json
+│       ├── stage4_rtl.json
+│       ├── *.v                # Generated Verilog files
+│       ├── stage5_verification.json
+│       ├── *_verified.v       # Verified Verilog files
+│       ├── stage6_system.json
+│       ├── stage7_final_approval.json
+│       └── complete_session.json
+│
+├── logs/                       # Log files (created at runtime)
+│   └── fpga_bot.log
+│
+├── README.md                   # Comprehensive documentation
+├── requirements.txt            # Python dependencies
+├── setup.sh                    # Installation script
+├── test_installation.py        # Installation verification
+└── .gitignore                  # Git ignore rules
+
+
+Workflow Stages
+===============
+
+Stage 0: Idea Validation
+  - HOD validates feasibility and gathers constraints
+  - Output: stage0_validation.json
+
+Stage 1: Requirement Freeze
+  - HOD creates frozen specification with exact parameters
+  - Output: stage1_requirements.json
+  - Gate: Must be approved to proceed
+
+Stage 2: Architecture Design
+  - Architecture role designs block diagram and FSMs
+  - Output: stage2_architecture.json
+
+Stage 3: Architecture Approval
+  - HOD approves or rejects architecture
+  - Output: stage3_approval.json
+  - Gate: Must be approved to proceed
+
+Stage 4: RTL Generation
+  - RTL role generates synthesizable Verilog
+  - Output: stage4_rtl.json + *.v files
+
+Stage 5: Verification Audit
+  - Toolchain validation (Yosys, Verilator)
+  - Verification role audits and fixes errors
+  - Auto-fix loop (up to 3 iterations)
+  - Output: stage5_verification.json + *_verified.v files
+  - Gate: Must pass to proceed
+
+Stage 6: System Feasibility
+  - System role analyzes resources, timing, risks
+  - Output: stage6_system.json
+
+Stage 7: Final Approval
+  - HOD final GO/NO-GO decision
+  - Output: stage7_final_approval.json
+  - Gate: Production readiness check
+
+
+Role Responsibilities
+======================
+
+HOD (Head of Design)
+  - Master orchestrator and decision authority
+  - Validates ideas and feasibility
+  - Freezes requirements (no ambiguity)
+  - Approves/rejects at gate points
+  - Final production approval
+  - NO implementation authority
+
+Architecture Designer
+  - Designs block diagrams
+  - Creates FSM specifications
+  - Defines interfaces and signals
+  - Plans data paths
+  - NO CODE GENERATION
+
+RTL Engineer
+  - Generates synthesizable Verilog
+  - Implements exact architecture
+  - Follows coding standards
+  - ONLY writes code
+
+Verification Engineer
+  - Audits RTL for correctness
+  - Runs toolchain validation
+  - Fixes synthesis/lint errors
+  - Ensures best practices
+
+System Engineer
+  - Estimates resources (LUTs, FFs, BRAMs)
+  - Analyzes timing feasibility
+  - Assesses implementation risks
+  - Recommends FPGA families
+
+
+File Descriptions
+=================
+
+Core Modules:
+  main.py          - Entry point, CLI, session management
+  config.py        - Configuration, API keys, model selection
+  llm_router.py    - Groq API calls, response parsing
+  toolchain.py     - Yosys/Verilator integration
+  stage_controller.py - Stage orchestration, workflow control
+
+Role Implementations:
+  roles/hod.py           - Validation, approval gates
+  roles/architecture.py  - Block/FSM design
+  roles/rtl.py          - Verilog generation
+  roles/verification.py - RTL audit and fixes
+  roles/system_role.py  - Feasibility analysis
+
+Supporting Files:
+  prompts/*.txt         - Role-specific prompts
+  examples/*.json       - Example specifications
+  README.md            - Complete documentation
+  setup.sh             - Installation script
+  test_installation.py - Verification test
+
+
+Key Features
+============
+
+✓ Multi-model routing (Llama 3.3 70B, Mixtral, etc.)
+✓ Deterministic 8-stage workflow
+✓ Automatic error detection and fixing
+✓ Toolchain integration (Yosys, Verilator)
+✓ Structured JSON outputs
+✓ Complete session logging
+✓ Production-quality code generation
+✓ Gate-based approval system
+✓ Role authority separation

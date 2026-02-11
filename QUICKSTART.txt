@@ -1,0 +1,265 @@
+================================================================================
+FPGA AI Design Bot - Quick Start Guide
+================================================================================
+
+WHAT YOU HAVE
+-------------
+A complete, production-grade multi-role AI system for FPGA design automation.
+This orchestrates 5 specialized AI roles through an 8-stage gated workflow to
+produce synthesizable, verified Verilog RTL from high-level descriptions.
+
+
+IMMEDIATE SETUP (< 2 minutes)
+------------------------------
+
+1. Set your Groq API key:
+   export GROQ_API_KEY='your-api-key-here'
+
+2. Install Python dependencies:
+   pip install requests
+
+3. Run the test to verify:
+   python test_installation.py
+
+4. Try your first design:
+   python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+
+FIRST RUN EXAMPLE
+-----------------
+
+Command:
+  python main.py "Design a debouncer for a push button with 10ms debounce time"
+
+What happens:
+  ✓ Stage 0: HOD validates idea, gathers constraints (30s)
+  ✓ Stage 1: HOD freezes exact requirements (30s)
+  ✓ Stage 2: Architecture designs blocks/FSMs (60s)
+  ✓ Stage 3: HOD approves architecture (20s)
+  ✓ Stage 4: RTL generates Verilog code (90s)
+  ✓ Stage 5: Verification checks + auto-fixes (60s)
+  ✓ Stage 6: System checks feasibility (40s)
+  ✓ Stage 7: HOD final approval (20s)
+
+Output Location:
+  outputs/YYYYMMDD_HHMMSS/
+    ├── debouncer.v                    # Generated Verilog
+    ├── debouncer_verified.v           # Verified Verilog
+    ├── stage0_validation.json         # All stage outputs
+    ├── ...
+    └── complete_session.json          # Full session data
+
+
+PROJECT STRUCTURE
+-----------------
+
+fpga_ai_bot/
+  ├── main.py              # Run this
+  ├── config.py            # Configure models/settings here
+  ├── roles/               # 5 AI roles (hod, architecture, rtl, verification, system)
+  ├── prompts/             # Role prompt templates
+  └── examples/            # Sample specifications
+
+
+THE 5 ROLES
+-----------
+
+1. HOD (Head of Design) - Master controller
+   - Validates ideas
+   - Freezes requirements
+   - Approval gates
+   - Final GO/NO-GO
+
+2. Architecture - Designs structure (NO CODE)
+   - Block diagrams
+   - FSM specifications
+   - Interface definitions
+
+3. RTL - Writes synthesizable Verilog
+   - Generates code
+   - Follows architecture exactly
+   - Production-quality output
+
+4. Verification - Ensures correctness
+   - Runs Yosys synthesis check
+   - Runs Verilator lint check
+   - Auto-fixes errors
+   - 3-iteration fix loop
+
+5. System - Checks feasibility
+   - Resource estimates
+   - Timing analysis
+   - Risk assessment
+   - FPGA recommendations
+
+
+USAGE PATTERNS
+--------------
+
+Simple one-liner:
+  python main.py "SPI master controller, mode 0, 4MHz"
+
+With target FPGA:
+  python main.py "I2C master, 100kHz" --target ice40
+
+From spec file:
+  python main.py --spec examples/sample_spec.json
+
+With debug logging:
+  python main.py "your design" --debug
+
+
+WHAT MAKES THIS PRODUCTION-GRADE
+---------------------------------
+
+✓ Role separation - No authority overlap
+✓ Gate enforcement - Workflow stops on failure
+✓ Toolchain integration - Real synthesis/lint checks
+✓ Auto-fix loop - Errors fixed automatically
+✓ Structured outputs - JSON at every stage
+✓ Complete logging - Full audit trail
+✓ Error recovery - Graceful handling
+✓ Real code - No placeholders or TODOs
+
+
+CUSTOMIZATION
+-------------
+
+Edit config.py to change:
+  - AI models per role
+  - Temperature settings
+  - Max fix iterations
+  - Enable/disable toolchain checks
+
+Edit prompts/*.txt to modify:
+  - Role behavior
+  - Output formats
+  - Quality standards
+
+
+TOOLCHAIN (OPTIONAL)
+--------------------
+
+Install for enhanced verification:
+  sudo apt-get install yosys verilator symbiyosys
+
+Without toolchain:
+  - System still works
+  - Verification is prompt-based only
+  - No automated synthesis/lint checks
+
+
+OUTPUT FILES
+------------
+
+Generated Verilog:
+  outputs/YYYYMMDD_HHMMSS/*.v           # Original RTL
+  outputs/YYYYMMDD_HHMMSS/*_verified.v  # Verified RTL
+
+Stage Data (JSON):
+  stage0_validation.json     - Idea validation
+  stage1_requirements.json   - Frozen requirements
+  stage2_architecture.json   - Architecture design
+  stage3_approval.json       - Architecture approval
+  stage4_rtl.json           - Generated RTL
+  stage5_verification.json  - Verification results
+  stage6_system.json        - Feasibility analysis
+  stage7_final_approval.json - Final approval
+  complete_session.json     - Everything
+
+Logs:
+  logs/fpga_bot.log - Complete execution log
+
+
+EXAMPLE DESIGNS TO TRY
+----------------------
+
+1. UART Transmitter:
+   python main.py "UART TX, 115200 baud, 8N1, 16-deep FIFO"
+
+2. SPI Master:
+   python main.py "SPI master, mode 0, 4MHz, 8-bit transfers"
+
+3. Debouncer:
+   python main.py "Button debouncer, 10ms debounce time"
+
+4. Counter:
+   python main.py "16-bit up counter with enable and reset"
+
+5. PWM Generator:
+   python main.py "PWM generator, 8-bit duty cycle, 1kHz frequency"
+
+
+VERIFICATION PROCESS
+--------------------
+
+Stage 5 automatically:
+  1. Runs Yosys synthesis check
+  2. Runs Verilator lint check
+  3. If errors found → Verification role fixes
+  4. Re-runs toolchain validation
+  5. Repeats up to 3 times
+  6. Only proceeds if all checks pass
+
+
+TYPICAL SESSION TIME
+--------------------
+
+Simple design (single module):    3-5 minutes
+Medium (multiple modules):        5-8 minutes
+Complex (FSMs, multiple clocks):  8-15 minutes
+
+Most time spent in:
+  - RTL generation (largest model outputs)
+  - Verification (iterative fixing)
+
+
+SUCCESS CRITERIA
+----------------
+
+Design is complete when:
+  ✓ Stage 7 shows "approved": true
+  ✓ Verification passed
+  ✓ Verilog files in outputs/
+  ✓ No synthesis errors
+  ✓ No lint warnings
+
+
+TROUBLESHOOTING
+---------------
+
+"GROQ_API_KEY not set"
+  → export GROQ_API_KEY='your-key'
+
+"Toolchain not found"
+  → Optional: Install yosys/verilator
+  → Or: Disable in config.py
+
+"Verification failed after 3 iterations"
+  → Check stage5_verification.json for errors
+  → Review generated Verilog manually
+  → May need to simplify design
+
+
+NEXT STEPS
+----------
+
+1. Run test_installation.py
+2. Try example designs
+3. Review outputs/ directory
+4. Read README.md for details
+5. Customize config.py for your workflow
+
+
+SUPPORT
+-------
+
+Check logs:     logs/fpga_bot.log
+Review outputs: outputs/YYYYMMDD_HHMMSS/
+Read docs:      README.md
+Run tests:      python test_installation.py
+
+
+================================================================================
+Ready to design? → python main.py "your design idea here"
+================================================================================

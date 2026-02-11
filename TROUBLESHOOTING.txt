@@ -1,0 +1,175 @@
+TROUBLESHOOTING GUIDE - Stage 0 Validation
+===========================================
+
+SYMPTOM: Stage 0 rejects all designs
+-------------------------------------
+
+If you see:
+  "Stage 0 complete. Approved: False"
+  "Idea rejected: No reason given"
+
+DIAGNOSIS STEPS:
+
+1. Run the diagnostic tool:
+   python diagnose_stage0.py
+
+   This will show you the exact JSON the LLM is returning.
+
+2. Check the raw output:
+   Look in outputs/YYYYMMDD_HHMMSS/stage0_validation.json
+   
+   You should see something like:
+   {
+     "approved": true,
+     "feasible": true,
+     "assessment": "...",
+     "assumptions": [...]
+   }
+
+3. If "approved": false, check if:
+   - The LLM is being too conservative
+   - The API key is valid
+   - The model is responding correctly
+
+COMMON CAUSES:
+--------------
+
+1. Model Temperature Too High
+   - Solution: Check config.py, temperature should be 0.1 (low)
+
+2. Model Not Following JSON Format
+   - Run: python diagnose_stage0.py
+   - Check if output is valid JSON
+   - May need to adjust response_format parameter
+
+3. Prompt Not Being Followed
+   - The system prompt includes an example now
+   - Should guide the model to approve standard designs
+
+4. API Issues
+   - Check GROQ_API_KEY is set correctly
+   - Try a simple API call manually
+   - Check rate limits
+
+EXPECTED BEHAVIOR:
+------------------
+
+For this input:
+  "UART transmitter with 8-bit data, 115200 baud"
+
+Expected JSON output:
+{
+  "approved": true,
+  "feasible": true,
+  "assessment": "Standard FPGA UART design, well-established implementation",
+  "questions": [],
+  "assumptions": [
+    "System clock: 50 MHz",
+    "FIFO depth: 16 bytes",
+    "Reset: Synchronous active-high",
+    "Stop bits: 1",
+    "Parity: None"
+  ]
+}
+
+MANUAL WORKAROUND:
+------------------
+
+If Stage 0 keeps failing, you can bypass it temporarily:
+
+1. Create a specification file with all details:
+   See examples/sample_spec.json for format
+
+2. Run with --spec:
+   python main.py --spec examples/sample_spec.json
+
+3. This skips Stage 0 and goes directly to Stage 1
+
+DEBUGGING LLMROUTER:
+--------------------
+
+Check if the LLM router is working:
+
+python -c "
+from config import Config
+from llm_router import LLMRouter
+
+config = Config()
+llm = LLMRouter(config)
+
+response = llm.call_with_system_prompt(
+    role='hod',
+    system_prompt='You are a helpful assistant.',
+    user_prompt='Say hello in JSON format: {\"message\": \"your message\"}',
+    response_format='json'
+)
+
+print(response['content'])
+"
+
+You should see valid JSON in the response.
+
+CHECKING API CONNECTIVITY:
+---------------------------
+
+Test direct API call:
+
+curl -X POST "https://api.groq.com/openai/v1/chat/completions" \
+  -H "Authorization: Bearer $GROQ_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama-3.3-70b-versatile",
+    "messages": [{"role": "user", "content": "Say hello"}],
+    "temperature": 0.1
+  }'
+
+Should return valid JSON with a response.
+
+FORCING APPROVAL FOR TESTING:
+------------------------------
+
+If you need to test later stages, you can temporarily modify
+roles/hod.py to always return approved:
+
+In validate_idea() function, add at the top:
+    return {
+        "approved": true,
+        "feasible": true,
+        "assessment": "Test approval",
+        "questions": [],
+        "assumptions": ["System clock: 50 MHz"]
+    }
+
+This lets you test stages 1-7 while debugging stage 0.
+
+REPORTING ISSUES:
+-----------------
+
+If none of the above helps, gather this information:
+
+1. Output of: python diagnose_stage0.py
+2. Contents of: outputs/*/stage0_validation.json
+3. Your GROQ model: Check config.py hod_model value
+4. Python version: python --version
+5. Requests version: pip show requests
+
+Common fixes:
+- Update requests: pip install --upgrade requests
+- Try different model in config.py
+- Check API quota/limits on Groq dashboard
+
+LAST RESORT:
+------------
+
+Use the specification file approach:
+1. Create detailed JSON spec (see examples/)
+2. Run: python main.py --spec your_spec.json
+3. This bypasses Stage 0 entirely
+
+Or modify the main.py to skip Stage 0:
+- Comment out stage0_idea_validation call
+- Manually create stage0_result dict with approved=true
+- Proceed to Stage 1
+
+This is a workaround, not a fix, but lets you use the system
+while investigating the root cause.

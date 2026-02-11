@@ -1,0 +1,45 @@
+{
+  "idea": "UART transmitter with configurable baud rate, 8-bit data, 1 stop bit, no parity",
+  "description": "Design a UART transmitter module that can send 8-bit data over a serial line. The baud rate should be configurable via a parameter. Include a FIFO buffer for outgoing data.",
+  "target_fpga": "ice40",
+  "constraints": {
+    "clock_frequency_mhz": 12,
+    "baud_rate": 115200,
+    "fifo_depth": 16,
+    "data_width": 8
+  },
+  "interfaces": [
+    {
+      "name": "system",
+      "signals": [
+        {"name": "clk", "direction": "input", "width": 1, "description": "System clock"},
+        {"name": "rst", "direction": "input", "width": 1, "description": "Active-high reset"}
+      ]
+    },
+    {
+      "name": "data_input",
+      "signals": [
+        {"name": "data_in", "direction": "input", "width": 8, "description": "Data to transmit"},
+        {"name": "data_valid", "direction": "input", "width": 1, "description": "Data valid signal"},
+        {"name": "ready", "direction": "output", "width": 1, "description": "Ready to accept data"}
+      ]
+    },
+    {
+      "name": "uart_output",
+      "signals": [
+        {"name": "tx", "direction": "output", "width": 1, "description": "UART transmit line"}
+      ]
+    }
+  ],
+  "requirements": {
+    "resource_targets": {
+      "max_luts": 100,
+      "max_ffs": 50,
+      "max_brams": 0
+    },
+    "timing": {
+      "max_latency_cycles": 20,
+      "notes": "Should be able to transmit at full baud rate without drops"
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "idea": "SPI master controller supporting mode 0, configurable clock divider, 8-bit transfers",
+  "description": "Design a SPI master controller that can communicate with SPI peripherals. Support SPI mode 0 (CPOL=0, CPHA=0), configurable SPI clock frequency via divider, 8-bit data transfers, and chip select control.",
+  "target_fpga": "ice40",
+  "constraints": {
+    "system_clock_mhz": 48,
+    "spi_clock_max_mhz": 12,
+    "data_width": 8,
+    "num_chip_selects": 4
+  },
+  "interfaces": [
+    {
+      "name": "system",
+      "signals": [
+        {"name": "clk", "direction": "input", "width": 1, "description": "System clock (48 MHz)"},
+        {"name": "rst_n", "direction": "input", "width": 1, "description": "Active-low reset"}
+      ]
+    },
+    {
+      "name": "control",
+      "signals": [
+        {"name": "data_in", "direction": "input", "width": 8, "description": "Data to transmit"},
+        {"name": "start", "direction": "input", "width": 1, "description": "Start transfer"},
+        {"name": "cs_sel", "direction": "input", "width": 2, "description": "Chip select (0-3)"},
+        {"name": "clk_div", "direction": "input", "width": 4, "description": "Clock divider (1-15)"},
+        {"name": "busy", "direction": "output", "width": 1, "description": "Transfer in progress"},
+        {"name": "data_out", "direction": "output", "width": 8, "description": "Received data"},
+        {"name": "done", "direction": "output", "width": 1, "description": "Transfer complete"}
+      ]
+    },
+    {
+      "name": "spi",
+      "signals": [
+        {"name": "sclk", "direction": "output", "width": 1, "description": "SPI clock"},
+        {"name": "mosi", "direction": "output", "width": 1, "description": "Master out, slave in"},
+        {"name": "miso", "direction": "input", "width": 1, "description": "Master in, slave out"},
+        {"name": "cs_n", "direction": "output", "width": 4, "description": "Chip selects (active low)"}
+      ]
+    }
+  ],
+  "requirements": {
+    "resource_targets": {
+      "max_luts": 150,
+      "max_ffs": 100,
+      "max_brams": 0
+    },
+    "timing": {
+      "max_latency_cycles": 50,
+      "notes": "Should support full-speed transfers with configurable divider"
+    },
+    "protocol": {
+      "spi_mode": "Mode 0 (CPOL=0, CPHA=0)",
+      "bit_order": "MSB first",
+      "cs_behavior": "Active during entire transfer, released when done"
+    }
+  }
+}

@@ -1,0 +1,139 @@
+FPGA AI Design Bot - Update Notes
+==================================
+
+VERSION: 1.0.1
+DATE: 2026-02-11
+
+FIXES APPLIED
+-------------
+
+Issue: Stage 0 validation was too strict and rejecting reasonable design ideas.
+
+Root Cause:
+- HOD role was asking too many clarifying questions
+- No mechanism to proceed with reasonable default assumptions
+- System was designed for interactive mode but running in batch mode
+
+Solution Applied:
+- Modified HOD validation prompt to be PERMISSIVE by default
+- HOD now makes reasonable engineering assumptions for missing constraints
+- Stage 0 only rejects fundamentally impossible ideas
+- Assumptions are logged and passed to Stage 1 for requirement freeze
+
+Changes Made:
+1. roles/hod.py - Updated validate_idea() system prompt
+   - Changed from "ask questions" to "make assumptions and approve"
+   - Added guidance: approve viable ideas, only reject if impossible
+   - Standard defaults: 50MHz clock, 16-deep FIFOs, typical protocols
+
+2. prompts/hod.txt - Updated role definition
+   - Added "BE PERMISSIVE in Stage 0" guidance
+   - Clarified when to reject vs. when to assume defaults
+
+3. stage_controller.py - Enhanced logging
+   - Shows number of assumptions made
+   - Logs rejection reasons clearly
+   - Better visibility into validation process
+
+VALIDATION BEHAVIOR (Updated)
+------------------------------
+
+WILL APPROVE:
+✓ "UART transmitter with 8-bit data, 115200 baud"
+  - Assumes: 50MHz system clock, 16-deep FIFO, standard interfaces
+  
+✓ "SPI master controller"
+  - Assumes: Mode 0, 8-bit transfers, 12MHz SPI clock, 50MHz system clock
+  
+✓ "Button debouncer with 10ms debounce time"
+  - Assumes: 50MHz clock, single button, active-high output
+  
+✓ "16-bit counter with enable and reset"
+  - Assumes: Synchronous reset, 50MHz clock, simple up counter
+
+WILL REJECT (rare):
+✗ "Build me an AI neural network accelerator with floating point"
+  - Reason: Too vague, unclear requirements, no FPGA-specific constraints
+  
+✗ "Design a CPU that runs at 10 GHz"
+  - Reason: Impossible frequency for FPGA technology
+
+TESTING THE FIX
+---------------
+
+Run the validation test:
+  python test_validation.py
+
+Or try the original failing command:
+  python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+Expected behavior:
+  Stage 0: ✓ Approved (with assumptions logged)
+  Stage 1: Requirements frozen with explicit values
+  Stages 2-7: Proceed normally
+
+DESIGN PHILOSOPHY
+-----------------
+
+The system is designed for BATCH mode (single-shot execution), not interactive.
+Therefore, the HOD must:
+  1. Be permissive at Stage 0 (make assumptions)
+  2. Be strict at Stage 1 (freeze exact requirements)
+  3. Be critical at gates 3 and 7 (approve/reject specific designs)
+
+This ensures the workflow proceeds without human intervention while maintaining
+quality gates at the right points.
+
+BACKWARDS COMPATIBILITY
+-----------------------
+
+✓ All existing specification files work unchanged
+✓ Output format is identical
+✓ Stage sequence is unchanged
+✓ API usage is unchanged
+
+The change only affects Stage 0 behavior to be more practical for batch execution.
+
+RECOMMENDED USAGE
+-----------------
+
+For best results, provide:
+- Clear design intent: "UART transmitter" not "serial communication thing"
+- Key parameters: "115200 baud" not "fast"
+- Data formats: "8-bit" not "standard"
+
+The system will fill in reasonable defaults for:
+- Clock frequencies (defaults to 50MHz system clock)
+- FIFO depths (defaults to 16 entries)
+- Reset types (defaults to synchronous, active-high)
+- Interface signals (defaults to standard handshaking)
+
+VERIFICATION
+------------
+
+To verify the fix is working:
+
+1. Run test suite:
+   python test_installation.py
+
+2. Run validation test:
+   python test_validation.py
+
+3. Try example designs:
+   python main.py "UART transmitter with 8-bit data, 115200 baud"
+   python main.py --spec examples/sample_spec.json
+   python main.py "SPI master controller, mode 0"
+
+All should now proceed past Stage 0 successfully.
+
+SUMMARY
+-------
+
+This update makes the system practical for real-world use by:
+- Allowing batch execution without interactive prompts
+- Making reasonable engineering assumptions
+- Still maintaining quality gates where they matter
+- Preserving the ability to provide detailed specs when desired
+
+The HOD is now your helpful colleague who fills in the blanks, not a
+bureaucrat who blocks progress with endless questions.

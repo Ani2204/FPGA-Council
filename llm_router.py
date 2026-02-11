@@ -1,0 +1,237 @@
+"""
+LLM Router for Groq API Integration
+Handles API calls, model routing, and response parsing
+"""
+
+import json
+import logging
+import time
+from typing import Dict, Any, Optional, List
+import requests
+
+from config import Config
+
+logger = logging.getLogger(__name__)
+
+
+class LLMRouter:
+    """Routes LLM requests to appropriate Groq models"""
+    
+    def __init__(self, config: Config):
+        self.config = config
+        self.api_key = config.groq_api_key
+        self.api_base = config.groq_api_base
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        })
+    
+    def call_role(
+        self,
+        role: str,
+        messages: List[Dict[str, str]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        response_format: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Call LLM for specific role
+        
+        Args:
+            role: Role name (hod, architecture, rtl, verification, system)
+            messages: List of message dicts with 'role' and 'content'
+            temperature: Override default temperature
+            max_tokens: Override default max_tokens
+            response_format: 'json' to request JSON output
+            
+        Returns:
+            Parsed response from LLM
+        """
+        model = self.config.get_model_for_role(role)
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature if temperature is not None else self.config.temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.config.max_tokens
+        }
+        
+        # Request JSON format if specified
+        if response_format == "json":
+            payload["response_format"] = {"type": "json_object"}
+        
+        logger.debug(f"Calling {role} role with model {model}")
+        logger.debug(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        try:
+            response = self._make_api_call(payload)
+            return response
+        except Exception as e:
+            logger.error(f"API call failed for role {role}: {e}")
+            raise
+    
+    def _make_api_call(
+        self,
+        payload: Dict[str, Any],
+        max_retries: int = 3,
+        retry_delay: float = 1.0
+    ) -> Dict[str, Any]:
+        """
+        Make API call with retry logic
+        
+        Args:
+            payload: Request payload
+            max_retries: Maximum number of retries
+            retry_delay: Delay between retries in seconds
+            
+        Returns:
+            Parsed API response
+        """
+        url = f"{self.api_base}/chat/completions"
+        
+        for attempt in range(max_retries):
+            try:
+                response = self.session.post(url, json=payload, timeout=120)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                # Extract content from response
+                if "choices" in data and len(data["choices"]) > 0:
+                    content = data["choices"][0]["message"]["content"]
+                    
+                    result = {
+                        "content": content,
+                        "model": data.get("model"),
+                        "usage": data.get("usage", {}),
+                        "raw_response": data
+                    }
+                    
+                    logger.debug(f"API call successful. Tokens used: {result['usage']}")
+                    return result
+                else:
+                    raise ValueError(f"Unexpected API response format: {data}")
+                    
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:  # Rate limit
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        logger.warning(f"Rate limited. Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                        continue
+                logger.error(f"HTTP error: {e}")
+                logger.error(f"Response: {e.response.text}")
+                raise
+                
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.warning(f"Request failed. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                logger.error(f"Request error: {e}")
+                raise
+        
+        raise Exception(f"API call failed after {max_retries} retries")
+    
+    def parse_json_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Parse JSON from LLM response content
+        
+        Args:
+            response: Response from call_role
+            
+        Returns:
+            Parsed JSON object
+        """
+        content = response["content"].strip()
+        
+        # Try to extract JSON if wrapped in markdown
+        if "```json" in content:
+            start = content.find("```json") + 7
+            end = content.find("```", start)
+            if end != -1:
+                content = content[start:end].strip()
+        elif "```" in content:
+            start = content.find("```") + 3
+            end = content.find("```", start)
+            if end != -1:
+                content = content[start:end].strip()
+        
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}")
+            logger.error(f"Content: {content}")
+            raise ValueError(f"Invalid JSON response from LLM: {e}")
+    
+    def extract_verilog_code(self, response: Dict[str, Any]) -> str:
+        """
+        Extract Verilog code from response
+        
+        Args:
+            response: Response from call_role
+            
+        Returns:
+            Extracted Verilog code
+        """
+        content = response["content"]
+        
+        # Try to extract from code blocks
+        if "```verilog" in content:
+            start = content.find("```verilog") + 10
+            end = content.find("```", start)
+            if end != -1:
+                return content[start:end].strip()
+        elif "```systemverilog" in content:
+            start = content.find("```systemverilog") + 16
+            end = content.find("```", start)
+            if end != -1:
+                return content[start:end].strip()
+        elif "```" in content:
+            # Generic code block
+            start = content.find("```") + 3
+            # Skip language identifier if present
+            newline = content.find("\n", start)
+            if newline != -1:
+                start = newline + 1
+            end = content.find("```", start)
+            if end != -1:
+                return content[start:end].strip()
+        
+        # If no code blocks, return entire content
+        return content.strip()
+    
+    def call_with_system_prompt(
+        self,
+        role: str,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: Optional[float] = None,
+        response_format: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Convenience method to call with system and user prompts
+        
+        Args:
+            role: Role name
+            system_prompt: System prompt
+            user_prompt: User prompt
+            temperature: Override temperature
+            response_format: 'json' for JSON output
+            
+        Returns:
+            LLM response
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        return self.call_role(
+            role=role,
+            messages=messages,
+            temperature=temperature,
+            response_format=response_format
+        )
