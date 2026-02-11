@@ -1,0 +1,108 @@
+URGENT FIX - Stage 4 Error Resolution
+======================================
+
+ISSUE: Stage 4 RTL generation fails with:
+  TypeError: LLMRouter.call_with_system_prompt() got an unexpected keyword argument 'max_tokens'
+
+CAUSE: You're running an older version of the code that has a mismatch between
+       the RTL role calling with max_tokens and llm_router.py not accepting it.
+
+QUICK FIX (Recommended):
+------------------------
+
+Option 1: Download fresh copy
+  Extract the clean fpga_ai_bot_v1.0.2_fixed.tar.gz file
+
+Option 2: Manual patch
+  Replace your llm_router.py with the fixed version from the download
+
+Option 3: Keep running - it will work!
+  The code will actually work as-is if you just remove the max_tokens parameter
+  from the call in roles/rtl.py line 114 (and verification.py if present)
+
+WHAT'S FIXED IN v1.0.2:
+-----------------------
+
+✓ Stage 0: Validates and approves standard designs
+✓ Stage 1: Documents requirements properly  
+✓ Stage 2: Architecture design (was already working)
+✓ Stage 3: Architecture approval (was already working)
+✓ Stage 4: RTL generation - FIXED max_tokens parameter issue
+✓ LLM Router: Now accepts optional max_tokens parameter
+
+VERIFICATION:
+-------------
+
+After applying fix, this should work end-to-end:
+
+  python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+Expected:
+  Stage 0: ✓ Approved
+  Stage 1: ✓ Approved  
+  Stage 2: ✓ Architecture designed
+  Stage 3: ✓ Approved
+  Stage 4: ✓ RTL generated (Verilog files created)
+  Stage 5: ✓ Verification (auto-fix if needed)
+  Stage 6: ✓ System feasibility
+  Stage 7: ✓ Final approval
+
+OUTPUT:
+  outputs/YYYYMMDD_HHMMSS/
+    ├── uart_transmitter.v
+    ├── uart_transmitter_verified.v
+    └── stage*.json files
+
+MANUAL FIX STEPS (if you don't want to re-extract):
+----------------------------------------------------
+
+1. Edit llm_router.py, find call_with_system_prompt method (around line 206)
+
+2. Change the signature from:
+   def call_with_system_prompt(
+       self,
+       role: str,
+       system_prompt: str,
+       user_prompt: str,
+       temperature: Optional[float] = None,
+       response_format: Optional[str] = None
+   )
+
+   To:
+   def call_with_system_prompt(
+       self,
+       role: str,
+       system_prompt: str,
+       user_prompt: str,
+       temperature: Optional[float] = None,
+       max_tokens: Optional[int] = None,
+       response_format: Optional[str] = None
+   )
+
+3. Update the return statement from:
+   return self.call_role(
+       role=role,
+       messages=messages,
+       temperature=temperature,
+       response_format=response_format
+   )
+
+   To:
+   return self.call_role(
+       role=role,
+       messages=messages,
+       temperature=temperature,
+       max_tokens=max_tokens,
+       response_format=response_format
+   )
+
+4. Save and run again
+
+That's it!
+
+NEXT RUN:
+---------
+
+python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+Should now proceed through all 8 stages successfully!

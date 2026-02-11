@@ -79,9 +79,17 @@ class StageController:
             stage0_result
         )
         
-        logger.info(f"Stage 1 complete. Approved: {result.get('approved', False)}")
-        if result.get("approved"):
-            logger.info(f"Frozen requirements: {json.dumps(result.get('requirements', {}), indent=2)}")
+        approved = result.get('approved', False)
+        logger.info(f"Stage 1 complete. Approved: {approved}")
+        
+        if approved:
+            requirements = result.get('requirements', {})
+            logger.info(f"Title: {requirements.get('title', 'N/A')}")
+            logger.info(f"Clock: {requirements.get('clock_specs', {}).get('primary_clock', {}).get('frequency_mhz', 'N/A')} MHz")
+        else:
+            logger.error(f"Stage 1 rejection reason: {result.get('rejection_reason', 'Unknown')}")
+            logger.error("This is unexpected - Stage 1 should document requirements, not reject")
+        
         
         return result
     

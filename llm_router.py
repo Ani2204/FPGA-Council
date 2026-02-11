@@ -209,6 +209,7 @@ class LLMRouter:
         system_prompt: str,
         user_prompt: str,
         temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
         response_format: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -219,6 +220,7 @@ class LLMRouter:
             system_prompt: System prompt
             user_prompt: User prompt
             temperature: Override temperature
+            max_tokens: Override max_tokens
             response_format: 'json' for JSON output
             
         Returns:
@@ -233,5 +235,6 @@ class LLMRouter:
             role=role,
             messages=messages,
             temperature=temperature,
+            max_tokens=max_tokens,
             response_format=response_format
         )
