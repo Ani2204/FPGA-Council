@@ -115,8 +115,7 @@ Return JSON output with all modules."""
         role="rtl",
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        response_format="json",
-        max_tokens=8192
+        response_format="json"
     )
     
     result = llm_router.parse_json_response(response)
@@ -125,7 +124,9 @@ Return JSON output with all modules."""
     modules = result.get("modules", [])
     logger.info(f"Generated {len(modules)} Verilog modules")
     for module in modules:
-        logger.info(f"  - {module['module_name']}")
+        # Handle different possible field names
+        module_name = module.get('module_name') or module.get('name') or 'unknown'
+        logger.info(f"  - {module_name}")
     
     return result
 

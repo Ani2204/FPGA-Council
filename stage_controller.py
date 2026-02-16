@@ -173,7 +173,9 @@ class StageController:
         
         logger.info(f"Stage 4 complete. Generated {len(result.get('modules', []))} modules.")
         for module in result.get("modules", []):
-            logger.info(f"  - {module['module_name']}")
+            # Handle different possible field names
+            module_name = module.get('module_name') or module.get('name') or 'unknown'
+            logger.info(f"  - {module_name}")
         
         return result
     

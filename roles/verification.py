@@ -37,47 +37,47 @@ def audit_rtl(
     Returns:
         Audit results with fixed modules if issues found
     """
-    system_prompt = _load_prompt("verify") or """You are the Verification Engineer. Your role is to audit RTL for correctness and synthesizability.
+    system_prompt = """You are the Verification Engineer. Your PRIMARY job is to fix RTL errors found by the toolchain.
 
-Your responsibilities:
-1. Review RTL against requirements and architecture
-2. Check for synthesis issues (latches, incomplete case statements, etc.)
-3. Verify timing considerations
-4. Check for common RTL bugs
-5. Fix any issues found by toolchain validation
-6. Ensure code follows best practices
+CRITICAL: If the toolchain reports ANY errors, you MUST:
+1. Set "has_issues": true
+2. Analyze the specific errors
+3. Provide fixed Verilog code in "fixed_modules"
 
-VERIFICATION CHECKLIST:
-- All combinational paths have complete assignments
-- No unintended latches
-- Proper reset handling (sync vs async)
-- Clock domain crossing handled properly
-- No simulation-only constructs in synthesis code
-- Bit widths match specifications
-- FSM encoding is explicit
-- No timing violations likely
-- Proper use of blocking vs non-blocking assignments
+TOOLCHAIN ERRORS ARE THE SOURCE OF TRUTH!
+If Yosys or Verilator reports errors, the RTL has issues - no exceptions.
 
-CRITICAL RULES:
-- Use toolchain errors as primary feedback
-- Fix errors without changing functionality
-- Maintain module interfaces
-- Document all changes made
-- Be conservative - don't over-optimize
+Common toolchain errors and fixes:
+- "inferred latch" → Add default assignments in all code paths
+- "multiple drivers" → Remove duplicate assignments to same signal  
+- "syntax error" → Fix Verilog syntax
+- "undeclared identifier" → Declare all signals
+- "width mismatch" → Match bit widths exactly
 
-Output ONLY valid JSON with this structure:
+Output ONLY valid JSON:
 {
-  "has_issues": boolean,
-  "overall_assessment": "summary of audit",
+  "has_issues": boolean,  ← TRUE if toolchain found ANY errors
+  "overall_assessment": "summary",
   "module_audits": [
     {
       "module_name": "name",
       "passed": boolean,
-      "issues_found": [
-        {
-          "type": "error|warning",
-          "description": "issue description",
-          "location": "line or block description",
+      "issues_found": [{"type": "error", "description": "..."}],
+      "toolchain_errors": ["list from validation"],
+      "recommendations": ["fixes needed"]
+    }
+  ],
+  "fixed_modules": [  ← REQUIRED if has_issues is true
+    {
+      "module_name": "name",
+      "verilog_code": "corrected code here",
+      "changes_made": ["specific changes"],
+      "verification_notes": "what was fixed"
+    }
+  ]
+}
+
+REMEMBER: If toolchain validation shows passed=false, you MUST provide fixes!
           "severity": "critical|major|minor"
         }
       ],
@@ -114,6 +114,12 @@ MODULES TO AUDIT:
 TOOLCHAIN VALIDATION RESULTS:
 {json.dumps([m['validation'] for m in module_info], indent=2)}
 
+CRITICAL INSTRUCTIONS:
+1. Check each validation result - if "passed": false, there ARE errors
+2. Read the "errors" and "warnings" arrays in validation results
+3. If ANY module has passed: false, set has_issues: true
+4. Provide fixed_modules with corrected Verilog code
+
 Audit all modules and provide fixes for any issues found.
 
 Return JSON output following the schema."""
@@ -122,8 +128,7 @@ Return JSON output following the schema."""
         role="verification",
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        response_format="json",
-        max_tokens=8192
+        response_format="json"
     )
     
     result = llm_router.parse_json_response(response)

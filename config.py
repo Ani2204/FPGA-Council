@@ -29,8 +29,13 @@ class Config:
     temperature: float = 0.1  # Low temperature for deterministic outputs
     max_tokens: int = 8192
     
+    # Rate Limit Handling
+    max_api_retries: int = 10  # Max retries for rate limits
+    rate_limit_retry_delay: float = 1.0  # Base delay for exponential backoff
+    auto_wait_on_rate_limit: bool = True  # Auto-wait when rate limited
+    
     # Workflow Parameters
-    max_verification_iterations: int = 3
+    max_verification_iterations: int = 7
     enable_formal_verification: bool = True
     enable_synthesis_check: bool = True
     enable_lint_check: bool = True

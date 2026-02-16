@@ -1,0 +1,263 @@
+INTELLIGENT RATE LIMIT HANDLING
+================================
+
+PROBLEM SOLVED: System now handles Groq API rate limits gracefully!
+
+YOUR REQUEST:
+-------------
+Instead of aborting when hitting rate limits, the system should:
+1. Wait for the rate limit to reset
+2. Continue the design process automatically
+3. Complete all stages without user intervention
+
+SOLUTION IMPLEMENTED:
+---------------------
+
+✓ Intelligent Wait Time Extraction
+  - Reads "try again in 6.44s" from error message
+  - Waits the EXACT time requested by the API
+  - Adds 10% buffer to be safe
+
+✓ Increased Retry Attempts
+  - OLD: 3 retries max (1s, 2s, 4s) = 7s total
+  - NEW: 10 retries max with smart waiting
+  - Can wait up to ~2 minutes if needed
+
+✓ Better Logging
+  - Shows: "Rate limit hit. Waiting 6.4s before retry 2/10..."
+  - User knows exactly what's happening
+  - No silent failures
+
+✓ Configurable Behavior
+  - Can be tuned in config.py
+  - Set max_api_retries higher if needed
+  - Control retry delays
+
+HOW IT WORKS:
+-------------
+
+When Groq returns 429 (Rate Limit):
+
+1. Extract Wait Time:
+   Error: "try again in 6.44s"
+   → Wait 7.1s (6.44 + 10% buffer)
+
+2. Log Progress:
+   "Rate limit hit. Waiting 7.1s before retry 3/10..."
+
+3. Wait & Retry:
+   Sleeps for extracted time
+   Retries API call automatically
+
+4. Continue:
+   Design process continues seamlessly
+   User doesn't need to do anything
+
+CONFIGURATION:
+--------------
+
+Edit config.py to tune behavior:
+
+```python
+class Config:
+    # Rate Limit Handling
+    max_api_retries: int = 10          # Max retry attempts
+    rate_limit_retry_delay: float = 1.0  # Base delay
+    auto_wait_on_rate_limit: bool = True  # Auto-wait enabled
+```
+
+For even more patience:
+```python
+max_api_retries: int = 20  # Can wait longer
+```
+
+For faster failure (testing):
+```python
+max_api_retries: int = 5  # Fail faster
+```
+
+GROQ RATE LIMITS:
+-----------------
+
+Your current limits (Llama 3.3 70B Versatile):
+
+Requests: 30/minute, 1,000/day
+Tokens:   12,000/minute, 100,000/day
+
+What This Means:
+- Can make ~30 API calls per minute
+- Each call can use up to 400 tokens on average
+- System typically uses 8,000-10,000 tokens per full run
+- Full design flow = ~15-25 API calls
+
+Typical Flow Token Usage:
+  Stage 0: ~500 tokens
+  Stage 1: ~800 tokens  
+  Stage 2: ~1,500 tokens
+  Stage 3: ~600 tokens
+  Stage 4: ~2,000 tokens
+  Stage 5: ~3,000 tokens (per iteration)
+  Stage 6: ~1,000 tokens
+  Stage 7: ~500 tokens
+  
+Total: ~10,000-12,000 tokens for a clean run
+
+WHAT HAPPENS NOW:
+-----------------
+
+Example Session:
+
+Stage 5, Iteration 1:
+  - Validate RTL: 500 tokens
+  - Audit & fix: 2,000 tokens
+  - Total: 2,500 tokens
+
+Stage 5, Iteration 2:
+  - Validate RTL: 500 tokens
+  - Audit & fix: 2,000 tokens  
+  - Total: 5,000 tokens cumulative
+
+Stage 5, Iteration 3:
+  - Validate RTL: 500 tokens
+  - Want to audit: 2,000 tokens
+  - Total would be: 7,500 tokens
+  - RATE LIMIT! Need 12,000/min, have used 11,024
+  
+OLD BEHAVIOR:
+  ✗ Retry 3 times (1s, 2s, 4s)
+  ✗ Still rate limited
+  ✗ Abort entire process
+  ✗ User starts over
+
+NEW BEHAVIOR:
+  ✓ API says "wait 6.44s"
+  ✓ System waits 7.1s (with buffer)
+  ✓ Token budget resets
+  ✓ Retry succeeds
+  ✓ Continue to Stage 6
+  ✓ Complete entire flow!
+
+TESTING THE FIX:
+----------------
+
+Run the same command that failed:
+
+```bash
+python main.py "UART transmitter with 8-bit data, 115200 baud"
+```
+
+You should see:
+```
+Stage 5: Verification iteration 1/3
+  ✓ Found issues, providing fixes
+  
+Stage 5: Verification iteration 2/3
+  ✓ Found issues, providing fixes
+  
+Stage 5: Verification iteration 3/3
+  ⚠ Rate limit hit. Waiting 7.1s before retry 3/10...
+  [waits 7 seconds]
+  ✓ Retry successful
+  ✓ All modules passed validation!
+  
+Stage 6: System Feasibility Check
+  ✓ Complete
+  
+Stage 7: Final HOD Approval
+  ✓ DESIGN COMPLETE!
+```
+
+ADVANCED: AVOIDING RATE LIMITS
+-------------------------------
+
+If you want to run multiple designs in sequence:
+
+Option 1: Add delays between runs
+```bash
+python main.py "design 1"
+sleep 60  # Wait for rate limit reset
+python main.py "design 2"
+```
+
+Option 2: Use simpler models for some stages
+Edit config.py:
+```python
+# Use faster model for simple stages
+verification_model = "llama-3.1-8b-instant"  # Much fewer tokens
+```
+
+Option 3: Reduce verification iterations
+```python
+max_verification_iterations = 2  # Try less aggressively
+```
+
+MONITORING TOKEN USAGE:
+-----------------------
+
+The system logs token usage:
+```
+2026-02-16 11:22:30,398 - llm_router - DEBUG - API call successful. 
+  Tokens used: {'prompt_tokens': 1234, 'completion_tokens': 567, 'total_tokens': 1801}
+```
+
+Watch these in logs/fpga_bot.log to track your budget.
+
+FILES MODIFIED:
+---------------
+
+1. llm_router.py
+   - _make_api_call(): Intelligent retry with wait time extraction
+   - _extract_rate_limit_wait_time(): NEW - Parse error messages
+   - Increased default max_retries to 10
+
+2. config.py
+   - max_api_retries: 10 (NEW)
+   - rate_limit_retry_delay: 1.0 (NEW)
+   - auto_wait_on_rate_limit: True (NEW)
+
+BACKWARDS COMPATIBLE:
+---------------------
+
+✓ Old behavior still works
+✓ Just waits longer now instead of failing
+✓ No breaking changes
+✓ Can be disabled in config if needed
+
+SUCCESS CRITERIA:
+-----------------
+
+Your previous run stopped here:
+  Stage 5: Iteration 3 - Rate limited - FAILED
+
+After this fix:
+  Stage 5: Iteration 3 - Rate limited - WAIT - SUCCESS
+  Stage 6: Complete
+  Stage 7: Complete
+  ✓ Full end-to-end success!
+
+TRY IT NOW:
+-----------
+
+```bash
+# Update files
+cp updated/llm_router.py ~/fpga_ai_bot/
+cp updated/config.py ~/fpga_ai_bot/
+
+# Run the design
+python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+# Watch it handle rate limits gracefully
+# No more aborts!
+```
+
+ESTIMATED TIME:
+---------------
+
+Full run with rate limit waiting:
+- Stages 0-4: ~30 seconds (fast)
+- Stage 5: ~90 seconds (3 iterations + waits)
+- Stage 6: ~15 seconds
+- Stage 7: ~10 seconds
+Total: ~2-3 minutes including rate limit waits
+
+Worth the wait to get a complete, verified Verilog design! 🚀

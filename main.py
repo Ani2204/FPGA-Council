@@ -130,9 +130,16 @@ class FPGADesignBot:
             # Save Verilog files
             if "modules" in stage4_result:
                 for module in stage4_result["modules"]:
-                    verilog_path = self.output_dir / f"{module['module_name']}.v"
-                    verilog_path.write_text(module["verilog_code"])
-                    logger.info(f"Saved Verilog: {verilog_path}")
+                    # Handle different possible field names
+                    module_name = module.get('module_name') or module.get('name') or 'unnamed_module'
+                    verilog_code = module.get('verilog_code') or module.get('code') or module.get('verilog', '')
+                    
+                    if verilog_code:
+                        verilog_path = self.output_dir / f"{module_name}.v"
+                        verilog_path.write_text(verilog_code)
+                        logger.info(f"Saved Verilog: {verilog_path}")
+                    else:
+                        logger.warning(f"Module {module_name} has no verilog_code field")
             
             # Stage 5: Verification Audit with Auto-Fix Loop
             logger.info("\n" + "=" * 80)
@@ -149,9 +156,14 @@ class FPGADesignBot:
             # Save final verified Verilog
             if stage5_result.get("passed", False) and "final_modules" in stage5_result:
                 for module in stage5_result["final_modules"]:
-                    verilog_path = self.output_dir / f"{module['module_name']}_verified.v"
-                    verilog_path.write_text(module["verilog_code"])
-                    logger.info(f"Saved verified Verilog: {verilog_path}")
+                    module_name = module.get('module_name') or module.get('name') or 'unnamed_module'
+                    verilog_code = module.get('verilog_code') or module.get('code') or module.get('verilog', '')
+                    
+                    if verilog_code:
+                        verilog_path = self.output_dir / f"{module_name}_verified.v"
+                        verilog_path.write_text(verilog_code)
+                        logger.info(f"Saved verified Verilog: {verilog_path}")
+            
             
             if not stage5_result.get("passed", False):
                 logger.error("Stage 5 failed: Verification did not pass")

@@ -1,0 +1,141 @@
+STAGE 5 VERIFICATION FIX
+========================
+
+GREAT PROGRESS! Stages 0-4 completed successfully!
+
+CURRENT STATUS:
+---------------
+✓ Stage 0: Idea Validation - PASSED
+✓ Stage 1: Requirement Freeze - PASSED  
+✓ Stage 2: Architecture Design - PASSED
+✓ Stage 3: Architecture Approval - PASSED
+✓ Stage 4: RTL Generation - PASSED
+  - Generated: uart_transmitter.v
+⚠️  Stage 5: Verification - ISSUES DETECTED
+
+WHAT HAPPENED IN STAGE 5:
+--------------------------
+
+The toolchain (Yosys/Verilator) found errors in the generated Verilog,
+BUT the Verification role didn't recognize them and didn't provide fixes.
+
+Log showed:
+  "Verification role approved but toolchain validation failed!"
+
+This means:
+  - Yosys or Verilator found synthesis/lint errors
+  - The LLM didn't realize it needed to fix them
+  - No fixed_modules were provided
+
+THE FIX:
+--------
+
+Updated roles/verification.py to be MUCH more explicit:
+
+1. System prompt now SCREAMS at the LLM:
+   "TOOLCHAIN ERRORS ARE THE SOURCE OF TRUTH!"
+   "If passed: false, there ARE errors - no exceptions!"
+
+2. User prompt adds critical instructions:
+   - Check if "passed": false in validation results
+   - Read the errors/warnings arrays
+   - MUST provide fixed_modules if any issues
+
+APPLY THE FIX:
+--------------
+
+Replace this file:
+  roles/verification.py
+
+Then run again:
+  python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+EXPECTED BEHAVIOR:
+------------------
+
+Stage 5 should now:
+  1. Run Yosys synthesis check
+  2. Run Verilator lint check
+  3. Find errors (if any)
+  4. Verification role RECOGNIZES errors
+  5. Provides fixed Verilog code
+  6. Re-runs validation on fixed code
+  7. Repeats up to 3 times until clean
+
+SUCCESS LOOKS LIKE:
+-------------------
+
+Iteration 1:
+  - Toolchain finds errors
+  - Verification provides fixes
+  - Re-validate...
+
+Iteration 2:
+  - Toolchain checks fixed code
+  - Either: All passed! ✓
+  - Or: More fixes needed, repeat...
+
+Final:
+  - Stage 5 complete. Passed: True
+  - Saved verified Verilog: uart_transmitter_verified.v
+
+WHAT ERRORS MIGHT BE FOUND:
+----------------------------
+
+Common issues the toolchain catches:
+  - Inferred latches (incomplete case statements)
+  - Undeclared signals
+  - Width mismatches
+  - Multiple drivers on same signal
+  - Syntax errors
+  - Blocking assignments in sequential logic
+
+The Verification role should fix these automatically.
+
+DEBUGGING:
+----------
+
+If Stage 5 still fails after the fix, check:
+
+1. See what errors were found:
+   cat outputs/YYYYMMDD_HHMMSS/stage5_verification.json
+
+2. Look for validation_results[].errors
+   This shows exactly what Yosys/Verilator reported
+
+3. Check if has_issues was set to true
+   If false, the LLM still didn't recognize the errors
+
+4. Check if fixed_modules was provided
+   If missing, the LLM didn't provide fixes
+
+NEXT STAGES:
+------------
+
+After Stage 5 passes:
+  Stage 6: System Feasibility (estimates resources, timing)
+  Stage 7: Final HOD Approval (GO/NO-GO for production)
+
+Then you'll have:
+  - Complete verified Verilog RTL
+  - Synthesis-clean code
+  - Lint-clean code
+  - Ready for FPGA implementation!
+
+CONFIDENCE LEVEL:
+-----------------
+
+HIGH - The verification prompt is now very explicit about:
+  - Checking toolchain results
+  - Recognizing errors
+  - Providing fixes
+
+The LLM should now properly handle the auto-fix loop.
+
+TRY IT NOW:
+-----------
+
+cp updated/roles/verification.py ~/fpga_ai_bot/roles/
+python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+Good luck! We're SO close to a complete end-to-end run! 🎯

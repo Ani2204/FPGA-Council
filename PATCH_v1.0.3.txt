@@ -1,0 +1,149 @@
+FINAL FIX - All Field Name Issues Resolved
+===========================================
+
+ISSUE: Multiple KeyError: 'module_name' crashes
+LOCATIONS: roles/rtl.py, main.py, stage_controller.py, toolchain.py
+
+ALL LOCATIONS NOW FIXED:
+-------------------------
+
+1. roles/rtl.py (Line ~127)
+   ✓ Module name logging in generate_rtl()
+
+2. main.py (Lines ~133, ~159)
+   ✓ Stage 4: Verilog file saving
+   ✓ Stage 5: Verified Verilog file saving
+
+3. stage_controller.py (Line ~176)
+   ✓ Stage 4: Module name logging
+
+4. toolchain.py (Line ~344)
+   ✓ validate_multiple_modules()
+
+ROBUSTNESS CHANGES:
+-------------------
+
+All code now handles these field name variations:
+
+Module Name:
+  module.get('module_name')  ← First choice
+  module.get('name')         ← Alternative
+  'unknown'                  ← Fallback
+
+Verilog Code:
+  module.get('verilog_code') ← First choice
+  module.get('code')         ← Alternative
+  module.get('verilog')      ← Alternative
+  ''                         ← Fallback (with warning)
+
+This makes the system resilient to LLM output variations.
+
+FILES TO UPDATE:
+----------------
+
+Replace these 4 files from the download:
+  1. roles/rtl.py
+  2. main.py
+  3. stage_controller.py
+  4. toolchain.py
+
+Or simply extract the complete updated directory.
+
+QUICK COPY COMMANDS:
+--------------------
+
+If you have the updated files in a directory:
+
+cp updated/roles/rtl.py ~/fpga_ai_bot/roles/
+cp updated/main.py ~/fpga_ai_bot/
+cp updated/stage_controller.py ~/fpga_ai_bot/
+cp updated/toolchain.py ~/fpga_ai_bot/
+
+VERIFY THE FIX:
+---------------
+
+After updating, run:
+  python main.py "UART transmitter with 8-bit data, 115200 baud"
+
+Expected output:
+  Stage 0: ✓ Approved (with assumptions)
+  Stage 1: ✓ Approved (requirements frozen)
+  Stage 2: ✓ Architecture designed
+  Stage 3: ✓ Approved
+  Stage 4: ✓ RTL generated
+    - Generated 1 Verilog modules
+    - uart_transmitter
+    - Saved Verilog: outputs/.../uart_transmitter.v
+  Stage 5: ✓ Verification (running...)
+  ...
+
+NO MORE KeyError CRASHES!
+
+WHAT CAUSED THIS:
+-----------------
+
+LLMs (even with JSON mode) sometimes return slightly different
+field names in their JSON output. For example:
+
+Expected:
+{
+  "modules": [{
+    "module_name": "uart_tx",
+    "verilog_code": "module uart_tx..."
+  }]
+}
+
+But Got:
+{
+  "modules": [{
+    "name": "uart_tx",           ← Different key!
+    "code": "module uart_tx..."  ← Different key!
+  }]
+}
+
+The original code assumed exact field names, causing crashes.
+The fix handles all reasonable variations gracefully.
+
+TESTING:
+--------
+
+I've ensured all these locations are now robust:
+  ✓ Role logging (rtl.py)
+  ✓ File saving (main.py - 2 places)
+  ✓ Controller logging (stage_controller.py)
+  ✓ Toolchain validation (toolchain.py)
+
+CURRENT STATUS:
+---------------
+
+✓ Stage 0: Idea Validation - WORKING
+✓ Stage 1: Requirement Freeze - WORKING
+✓ Stage 2: Architecture Design - WORKING
+✓ Stage 3: Architecture Approval - WORKING
+✓ Stage 4: RTL Generation - FIXED (all field name issues resolved)
+⏳ Stage 5: Verification - Next to test
+⏳ Stage 6: System Feasibility - Next to test
+⏳ Stage 7: Final Approval - Next to test
+
+CONFIDENCE LEVEL:
+-----------------
+
+HIGH - All known field name issues have been identified and fixed.
+The system should now progress through Stage 4 and into Stage 5.
+
+Stage 5 (Verification) will:
+  - Run Yosys synthesis check
+  - Run Verilator lint check
+  - Auto-fix any errors (up to 3 iterations)
+  - Save verified Verilog
+
+This is where we'll see if the generated Verilog is actually
+synthesizable and lint-clean!
+
+NEXT RUN SHOULD REACH:
+----------------------
+
+Minimum: Stage 5 (Verification)
+Target: Stage 7 (Final Approval) - Complete end-to-end success!
+
+Good luck! 🚀

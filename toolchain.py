@@ -103,11 +103,11 @@ class ToolchainValidator:
                 "reason": "Verilator not available"
             }
         
+        # Build command - older Verilator versions don't support --top-module
         cmd = [
             self.config.verilator_path,
             "--lint-only",
             "-Wall",
-            f"--top-module={top_module}",
             verilog_file
         ]
         
@@ -332,7 +332,7 @@ check
         Validate multiple Verilog modules
         
         Args:
-            modules: List of dicts with 'module_name' and 'verilog_code'
+            modules: List of dicts with 'module_name'/'name' and 'verilog_code'/'code'
             target_fpga: Optional FPGA target
             
         Returns:
@@ -341,8 +341,19 @@ check
         results = []
         
         for module in modules:
-            module_name = module.get("module_name")
-            verilog_code = module.get("verilog_code")
+            # Handle different possible field names
+            module_name = module.get("module_name") or module.get("name") or "unknown"
+            verilog_code = module.get("verilog_code") or module.get("code") or module.get("verilog")
+            
+            if not verilog_code:
+                logger.error(f"Module {module_name} has no verilog code")
+                results.append({
+                    "module_name": module_name,
+                    "passed": False,
+                    "checks": {},
+                    "error": "No verilog code provided"
+                })
+                continue
             
             logger.info(f"Validating module: {module_name}")
             
