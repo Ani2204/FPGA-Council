@@ -108,6 +108,7 @@ class ToolchainValidator:
             self.config.verilator_path,
             "--lint-only",
             "-Wall",
+            "-Wno-DECLFILENAME",  # Ignore filename warnings (can't fix temp file names)
             verilog_file
         ]
         

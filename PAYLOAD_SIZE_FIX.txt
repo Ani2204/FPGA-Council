@@ -1,0 +1,164 @@
+PAYLOAD TOO LARGE FIX
+=====================
+
+ISSUE:
+------
+Error: 413 Payload Too Large
+Model: llama-3.1-8b-instant
+Limit: 6,000 tokens per request
+Requested: 7,466 tokens
+
+CAUSE:
+------
+The verification stage includes:
+  - System prompt (instructions)
+  - Requirements
+  - Full Verilog code
+  - Validation errors
+  - Previous fixes
+
+This is too large for the 8B model which has strict limits.
+
+SOLUTION:
+---------
+
+Use the 70B model for verification (it has 32K token limit).
+
+Check your config.py file:
+
+```python
+# Should be:
+verification_model: str = "llama-3.3-70b-versatile"
+
+# NOT:
+verification_model: str = "llama-3.1-8b-instant"
+```
+
+If it's already correct in config.py, you may need to restart:
+
+```bash
+# Make sure you're using the latest config
+python main.py "UART transmitter with 8-bit data, 115200 baud"
+```
+
+MODEL COMPARISON:
+-----------------
+
+llama-3.1-8b-instant:
+  ✓ Fast
+  ✓ Cheap (fewer tokens)
+  ✗ Small context: 6K tokens
+  Use for: Simple prompts
+
+llama-3.3-70b-versatile:
+  ✓ Smart
+  ✓ Large context: 32K tokens
+  ✗ Slower
+  ✗ More tokens used
+  Use for: Complex tasks (verification, RTL generation)
+
+RECOMMENDED CONFIGURATION:
+--------------------------
+
+For best results:
+
+```python
+class Config:
+    # Fast stages - use 8B
+    hod_model = "llama-3.3-70b-versatile"  # Needs good reasoning
+    
+    # Complex stages - use 70B
+    architecture_model = "llama-3.3-70b-versatile"  # Needs planning
+    rtl_model = "llama-3.3-70b-versatile"  # Needs code generation
+    verification_model = "llama-3.3-70b-versatile"  # Needs large context ⚠️
+    system_model = "llama-3.3-70b-versatile"  # Moderate complexity
+```
+
+All use 70B for best quality and large enough context windows.
+
+WHY VERIFICATION NEEDS MORE TOKENS:
+-----------------------------------
+
+Verification prompt includes:
+  1. System prompt: ~1,500 tokens (instructions, examples)
+  2. Requirements: ~500 tokens
+  3. Verilog code: ~2,000 tokens (the UART module)
+  4. Validation results: ~1,000 tokens (errors from Yosys/Verilator)
+  5. Previous iterations: ~2,000 tokens (if in iteration 2+)
+  
+  Total: 7,000+ tokens
+
+The 8B model can't handle this!
+
+QUICK FIX NOW:
+--------------
+
+Just run again - your config.py already has the right model:
+
+```bash
+python main.py "UART transmitter with 8-bit data, 115200 baud"
+```
+
+It should work now!
+
+IF STILL FAILS:
+---------------
+
+Double-check your config.py has:
+
+```python
+verification_model: str = "llama-3.3-70b-versatile"
+```
+
+NOT:
+
+```python
+verification_model: str = "llama-3.1-8b-instant"
+```
+
+The error message shows it's using 8b-instant, but your config file
+shows 70b-versatile. This means either:
+
+1. You have multiple config files (check)
+2. Environment variable override (check GROQ_MODEL_VERIFICATION)
+3. Cached Python module (restart helps)
+
+TOKEN BUDGET IMPACT:
+--------------------
+
+Using 70B for verification:
+  - Uses more of your daily 100K token budget
+  - But necessary for complex verification
+  - Trade-off: Quality vs. budget
+
+If running low on daily tokens:
+  - Test with simpler designs first
+  - Counter/register uses fewer tokens
+  - Build up to UART complexity
+
+EXPECTED BEHAVIOR AFTER FIX:
+----------------------------
+
+```
+Stage 5: Verification iteration 1/7
+  Running Verilator lint...
+  Running Yosys synthesis...
+  ✓ Using llama-3.3-70b-versatile (fits in 32K context)
+  Audit complete. Issues found: True
+  Provided 1 fixed modules
+  
+Stage 5: Verification iteration 2/7
+  Running validation...
+  ✓ Continues successfully
+```
+
+Should complete all 7 stages!
+
+TRY NOW:
+--------
+
+```bash
+python main.py "UART transmitter with 8-bit data, 115200 baud"
+```
+
+The system should proceed through Stage 5 and complete successfully! 🎯

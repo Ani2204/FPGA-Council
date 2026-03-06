@@ -109,16 +109,36 @@ Generate complete, synthesizable Verilog implementation for all modules.
 
 Ensure code is production-quality and follows all synthesis rules.
 
+IMPORTANT: Escape all special characters in the Verilog code properly for JSON.
+
 Return JSON output with all modules."""
 
-    response = llm_router.call_with_system_prompt(
-        role="rtl",
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        response_format="json"
-    )
-    
-    result = llm_router.parse_json_response(response)
+    # Try with JSON mode first, fall back to text mode if JSON validation fails
+    try:
+        response = llm_router.call_with_system_prompt(
+            role="rtl",
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            response_format="json"
+        )
+        result = llm_router.parse_json_response(response)
+    except Exception as e:
+        error_str = str(e)
+        if "json_validate_failed" in error_str or "JSON" in error_str:
+            logger.warning(f"JSON mode failed due to validation error: {e}")
+            logger.info("Retrying without strict JSON mode...")
+            
+            # Retry without JSON mode constraint
+            response = llm_router.call_with_system_prompt(
+                role="rtl",
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                response_format=None  # No strict JSON mode
+            )
+            result = llm_router.parse_json_response(response)
+        else:
+            # Some other error, re-raise it
+            raise
     
     # Log generated modules
     modules = result.get("modules", [])

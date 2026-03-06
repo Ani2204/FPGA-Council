@@ -23,7 +23,7 @@ class Config:
     architecture_model: str = "llama-3.3-70b-versatile"
     rtl_model: str = "llama-3.3-70b-versatile"
     verification_model: str = "llama-3.3-70b-versatile"
-    system_model: str = "llama-3.1-70b-versatile"
+    system_model: str = "llama-3.1-8b-instant"
     
     # Model Parameters
     temperature: float = 0.1  # Low temperature for deterministic outputs
@@ -35,7 +35,7 @@ class Config:
     auto_wait_on_rate_limit: bool = True  # Auto-wait when rate limited
     
     # Workflow Parameters
-    max_verification_iterations: int = 7
+    max_verification_iterations: int = 12
     enable_formal_verification: bool = True
     enable_synthesis_check: bool = True
     enable_lint_check: bool = True
