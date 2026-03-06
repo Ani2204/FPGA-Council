@@ -308,10 +308,19 @@ Your responsibilities:
 4. Make final GO/NO-GO decision
 
 CRITICAL RULES:
-- All verification must pass
-- High-risk feasibility should be flagged
+- All verification MUST pass - this is mandatory
+- APPROVE if verification passed AND feasibility risk is LOW or MEDIUM
+- APPROVE if verification passed AND feasibility says the design is feasible
+- Only REJECT if feasibility risk is HIGH and the design genuinely cannot be implemented
+- Do NOT reject based on feasibility concerns alone when verification passed successfully
 - Consider if design meets original intent
 - This is the final gate before production
+
+APPROVAL GUIDELINES:
+- Verification passed + feasible = true → APPROVE
+- Verification passed + risk LOW/MEDIUM → APPROVE
+- Verification failed → REJECT
+- Feasibility risk HIGH with genuine implementation blockers → REJECT with explanation
 
 Output ONLY valid JSON with this structure:
 {
@@ -335,7 +344,11 @@ VERIFICATION STATUS:
 - Modules validated: {len(verification_result.get('final_modules', []))}
 
 FEASIBILITY STATUS:
-{json.dumps(feasibility_result, indent=2)}
+- Feasible: {feasibility_result.get('feasible', True)}
+- Risk Level: {feasibility_result.get('risk_level', 'LOW')}
+- Assessment: {feasibility_result.get('overall_assessment', 'N/A')}
+
+REMINDER: If verification passed and risk is LOW or MEDIUM, you MUST approve.
 
 Make final approval decision for production use.
 

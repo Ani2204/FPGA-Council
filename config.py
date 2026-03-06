@@ -23,7 +23,7 @@ class Config:
     architecture_model: str = "llama-3.3-70b-versatile"
     rtl_model: str = "llama-3.3-70b-versatile"
     verification_model: str = "llama-3.3-70b-versatile"
-    system_model: str = "llama-3.1-8b-instant"
+    system_model: str = "llama-3.3-70b-versatile"
     
     # Model Parameters
     temperature: float = 0.1  # Low temperature for deterministic outputs

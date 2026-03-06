@@ -241,7 +241,24 @@ class FPGADesignBot:
         for stage_key, stage_name in stage_names.items():
             if stage_key in stages:
                 stage_data = stages[stage_key]
-                status = "✓ PASSED" if stage_data.get("approved") or stage_data.get("passed") else "✗ FAILED"
+                # Determine success based on the field each stage actually populates
+                if stage_key == "stage2":
+                    # Architecture design: success if the design has meaningful content
+                    block_diagram = stage_data.get("block_diagram")
+                    design_overview = stage_data.get("design_overview")
+                    success = bool(
+                        (isinstance(block_diagram, dict) and block_diagram) or
+                        (isinstance(design_overview, str) and design_overview.strip())
+                    )
+                elif stage_key == "stage4":
+                    # RTL generation: success if at least one module was generated
+                    success = bool(stage_data.get("modules"))
+                elif stage_key == "stage6":
+                    # System feasibility: success if the design is marked feasible
+                    success = stage_data.get("feasible", False)
+                else:
+                    success = bool(stage_data.get("approved") or stage_data.get("passed"))
+                status = "✓ PASSED" if success else "✗ FAILED"
                 print(f"  {stage_name}: {status}")
         
         # Check if design is complete
