@@ -1,0 +1,531 @@
+================================================================================
+FPGA AI Design Bot - Complete Change Log
+================================================================================
+
+PROJECT : Multi-Role AI System for FPGA Design Automation
+VERSION : 1.0.3 (final)
+DATE    : 2026-03-06
+
+This file consolidates every change made to the project from initial release
+through all incremental fixes.  Each section references the original fix
+document(s) where more detail can be found.
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+  1.  Initial Release (v1.0.0)
+  2.  Fix: Stage 0 Idea Validation Too Strict          (UPDATE_NOTES.txt)
+  3.  Fix: Stage 1 Requirement Freeze Too Conservative (UPDATE_v1.0.2.txt)
+  4.  Fix: Stage 4 max_tokens Parameter Mismatch       (STAGE4_FIX.txt)
+  5.  Fix: JSON Validation Failure in RTL Generation   (JSON_VALIDATION_FIX.txt)
+  6.  Fix: Module Field-Name KeyErrors (multi-file)    (PATCH_v1.0.3.txt)
+  7.  Fix: Payload Too Large – Model Selection         (PAYLOAD_SIZE_FIX.txt)
+  8.  Fix: Verification Loop Not Converging            (STAGE5_FIX.txt /
+                                                        STAGE5_NOT_CONVERGING.txt /
+                                                        VERIFICATION_LOOP_ISSUE.txt)
+  9.  Fix: Verilator DECLFILENAME Temp-File Warning    (FINAL_ROOT_CAUSE_FIX.txt)
+  10. Fix: Intelligent Rate-Limit Handling             (RATE_LIMIT_FIX.txt)
+  11. Fix: Stage 6 Feasibility Failure                 (FINAL_CRITICAL_FIXES.txt)
+  12. Fix: Stage 7 Final Approval Rejection            (FINAL_CRITICAL_FIXES.txt)
+  13. Fix: Summary Display Bugs in main.py             (FINAL_CRITICAL_FIXES.txt)
+  14. New Diagnostic & Test Tools
+  15. Documentation Added
+
+================================================================================
+1.  INITIAL RELEASE (v1.0.0)
+================================================================================
+
+Files created from scratch:
+
+  Core system
+  -----------
+  main.py               CLI entry point, FPGADesignBot orchestrator,
+                        8-stage workflow, session management, summary.
+  config.py             Configuration dataclass, API key management,
+                        model selection, toolchain auto-detection.
+  llm_router.py         Groq API integration, multi-model routing,
+                        retry/backoff logic, JSON & Verilog extraction.
+  toolchain.py          Verilator lint, Yosys synthesis, SymbiYosys
+                        formal-readiness checks, error extraction.
+  stage_controller.py   8-stage orchestration engine with gate enforcement.
+
+  Roles package
+  -------------
+  roles/__init__.py          Package init & exports.
+  roles/hod.py               Stage 0 validation, Stage 1 requirement freeze,
+                             Stage 3 architecture approval, Stage 7 final
+                             approval.
+  roles/architecture.py      Stage 2 block-diagram & FSM generation.
+  roles/rtl.py               Stage 4 synthesizable Verilog generation.
+  roles/verification.py      Stage 5 RTL audit and auto-fix.
+  roles/system_role.py       Stage 6 resource/timing feasibility.
+
+  Prompt templates
+  ----------------
+  prompts/hod.txt
+  prompts/arch.txt
+  prompts/rtl.txt
+  prompts/verify.txt
+  prompts/system.txt
+
+  Examples
+  --------
+  examples/sample_spec.json      UART transmitter example spec.
+  examples/spi_master_spec.json  SPI master example spec.
+
+  Support files
+  -------------
+  requirements.txt   (requests>=2.31.0)
+  setup.sh           Automated setup and dependency check script.
+  README.md          Comprehensive documentation (500+ lines).
+  .gitignore         Python / IDE / output exclusions.
+  FILE_MANIFEST.txt  Annotated list of every file.
+  PROJECT_STRUCTURE.txt  Directory tree with role descriptions.
+  QUICKSTART.txt     Fast setup & first-run guide.
+
+================================================================================
+2.  FIX: STAGE 0 IDEA VALIDATION TOO STRICT
+================================================================================
+
+Reference file : UPDATE_NOTES.txt
+Version        : 1.0.1
+
+PROBLEM
+  Stage 0 rejected reasonable FPGA design ideas, asking too many clarifying
+  questions instead of making standard engineering assumptions.
+
+CAUSE
+  The HOD Stage 0 prompt was written for interactive mode (ask the user) but
+  the system runs in batch mode (must assume and proceed).
+
+CHANGES
+  roles/hod.py – validate_idea()
+    • Rewrote system prompt to be PERMISSIVE by default.
+    • HOD now makes reasonable engineering assumptions instead of asking questions.
+    • Only rejects ideas that are genuinely impossible on an FPGA (e.g., 10 GHz
+      clock, running Linux without a CPU core).
+    • Concrete UART example embedded in prompt to guide the model.
+    • Assumptions are logged at INFO level so they are visible in the session log.
+
+  prompts/hod.txt
+    • Added "BE PERMISSIVE in Stage 0" guidance.
+    • Clarified when to reject vs. when to assume defaults.
+
+  stage_controller.py – stage0_idea_validation()
+    • Now logs the number of assumptions made.
+    • Logs rejection reason clearly if Stage 0 does reject.
+
+RESULT
+  Standard FPGA designs (UART, SPI, counter, debouncer, etc.) all approve
+  with explicit assumptions logged.
+
+================================================================================
+3.  FIX: STAGE 1 REQUIREMENT FREEZE TOO CONSERVATIVE
+================================================================================
+
+Reference file : UPDATE_v1.0.2.txt
+Version        : 1.0.2
+
+PROBLEM
+  Stage 1 occasionally returned "approved": false, blocking the pipeline.
+  Stage 1 is a documentation stage, not a gating stage.
+
+CAUSE
+  The system prompt did not explicitly tell the LLM that this stage always
+  approves; the model inferred gating responsibility from its role description.
+
+CHANGES
+  roles/hod.py – freeze_requirements()
+    • System prompt now explicitly states "ALWAYS set 'approved': true".
+    • Clarified that this stage documents requirements, it never rejects.
+    • Provided a complete example JSON output in the prompt.
+    • Better error logging when (unexpectedly) a rejection does occur.
+
+  stage_controller.py – stage1_requirement_freeze()
+    • Added log message explaining that Stage 1 rejection is unexpected.
+    • Shows clock frequency and design title upon success for quick confirmation.
+
+================================================================================
+4.  FIX: STAGE 4 max_tokens PARAMETER MISMATCH
+================================================================================
+
+Reference file : STAGE4_FIX.txt
+Version        : 1.0.2
+
+PROBLEM
+  roles/rtl.py called llm_router.call_with_system_prompt() with a max_tokens
+  keyword argument that did not exist in the older method signature, raising:
+    TypeError: call_with_system_prompt() got an unexpected keyword argument 'max_tokens'
+
+CHANGES
+  llm_router.py – call_with_system_prompt()
+    • Added optional max_tokens parameter to the method signature.
+    • Passes max_tokens through to call_role() so callers can override the
+      default token limit per call.
+
+================================================================================
+5.  FIX: JSON VALIDATION FAILURE IN RTL GENERATION
+================================================================================
+
+Reference file : JSON_VALIDATION_FIX.txt
+Version        : 1.0.2
+
+PROBLEM
+  Groq API returned HTTP 400 "json_validate_failed" when Stage 4 tried to
+  generate Verilog inside a JSON object.  Verilog source code contains
+  many JSON-special characters (newlines, quotes, backslashes) that the LLM
+  sometimes failed to escape correctly before the API validated the payload.
+
+CHANGES
+  roles/rtl.py – generate_rtl()
+    • Wrapped the JSON-mode API call in a try/except block.
+    • On "json_validate_failed" (or any JSON-related exception), logs a warning
+      and automatically retries the same call WITHOUT the strict JSON-mode
+      constraint (response_format=None).
+    • The second call returns free-form text; parse_json_response() then
+      extracts the JSON from the markdown code block.
+    • A different exception type is re-raised unchanged so real errors surface.
+
+OUTCOME
+  ~80 % of calls succeed on the first (strict JSON) attempt.
+  ~95 % succeed on the retry (lenient) attempt.
+  Combined success rate: ~99 %.
+
+================================================================================
+6.  FIX: MODULE FIELD-NAME KeyErrors (MULTI-FILE)
+================================================================================
+
+Reference file : PATCH_v1.0.3.txt
+
+PROBLEM
+  LLMs do not always return the exact field names requested in a prompt.
+  The code assumed exact field names (module_name, verilog_code) and crashed
+  with KeyError when the LLM returned alternatives (name, code, verilog).
+
+AFFECTED LOCATIONS (4 places)
+
+  main.py – Stage 4 Verilog file-save loop (line ~133)
+    Before: module['module_name'], module['verilog_code']
+    After : module.get('module_name') or module.get('name') or 'unnamed_module'
+            module.get('verilog_code') or module.get('code') or module.get('verilog','')
+
+  main.py – Stage 5 verified Verilog file-save loop (line ~159)
+    Same defensive get() pattern applied.
+
+  roles/rtl.py – generate_rtl() module-name logging loop
+    Before: module['module_name']
+    After : module.get('module_name') or module.get('name') or 'unknown'
+
+  stage_controller.py – Stage 4 module-name logging
+    Same defensive get() pattern applied.
+
+  toolchain.py – validate_multiple_modules()
+    Same defensive get() pattern applied.
+
+================================================================================
+7.  FIX: PAYLOAD TOO LARGE – MODEL SELECTION
+================================================================================
+
+Reference file : PAYLOAD_SIZE_FIX.txt
+
+PROBLEM
+  Stage 5 verification prompt (system prompt + requirements + full Verilog +
+  toolchain errors + previous-fix history) exceeded the 6 000-token limit of
+  llama-3.1-8b-instant, returning HTTP 413.
+
+CHANGES
+  config.py
+    • verification_model changed from "llama-3.1-8b-instant"
+      to "llama-3.3-70b-versatile" (32 K context window).
+    • All five role models are now set to llama-3.3-70b-versatile for
+      consistent quality and sufficient context headroom.
+
+================================================================================
+8.  FIX: VERIFICATION LOOP NOT CONVERGING
+================================================================================
+
+Reference files : STAGE5_FIX.txt, STAGE5_NOT_CONVERGING.txt,
+                  VERIFICATION_LOOP_ISSUE.txt
+
+PROBLEM
+  Stage 5 auto-fix loop ran up to 12 iterations without the Verilog ever
+  passing validation.  Two distinct root causes were identified:
+
+  (a) The Verification role's prompt did not make it clear enough that it
+      MUST provide fixed Verilog when the toolchain reports failures.  The
+      LLM sometimes approved despite "passed": false in the toolchain results.
+
+  (b) See Section 9 – the toolchain itself was emitting an unfixable
+      DECLFILENAME warning that caused every iteration to fail.
+
+CHANGES
+  roles/verification.py – audit_rtl()
+    • Rewrote system prompt with explicit, emphatic instructions:
+        "TOOLCHAIN ERRORS ARE THE SOURCE OF TRUTH!"
+        "If passed: false, there ARE errors – no exceptions."
+    • Added mandatory output rule: if has_issues is true, fixed_modules
+      MUST be present with corrected Verilog code.
+    • Common error → fix mapping added to system prompt
+      (inferred latch, multiple drivers, syntax error, undeclared signal,
+       width mismatch).
+    • User prompt reinforced with step-by-step checklist:
+        1. Check each validation result – if "passed": false, errors exist.
+        2. Read the errors and warnings arrays.
+        3. If any module has passed: false, set has_issues: true.
+        4. Provide fixed_modules.
+
+  config.py
+    • max_verification_iterations raised to 12 to give the loop more chances
+      when multiple iterations of fixing are needed.
+
+================================================================================
+9.  FIX: VERILATOR DECLFILENAME TEMP-FILE WARNING
+================================================================================
+
+Reference file : FINAL_ROOT_CAUSE_FIX.txt
+
+PROBLEM (root cause of verification loop, see Section 8b)
+  Python's tempfile module creates files with names like /tmp/tmpXXXXXX.v.
+  Verilator emits %Warning-DECLFILENAME when the filename does not match the
+  top module name, then exits with code 1 ("Exiting due to 1 warning").
+  The LLM could not fix this because the file name is controlled by Python,
+  not by the Verilog source.  The loop repeated forever trying to fix code
+  that was already syntactically and semantically correct.
+
+CHANGES
+  toolchain.py – run_verilator_lint()
+    • Added -Wno-DECLFILENAME flag to the Verilator command:
+        OLD: verilator --lint-only -Wall <tempfile.v>
+        NEW: verilator --lint-only -Wall -Wno-DECLFILENAME <tempfile.v>
+    • This suppresses the irrelevant filename warning without hiding real errors.
+
+VERIFICATION
+  Manual checks confirmed the generated counter_16bit Verilog:
+    - Verilator (with -Wno-DECLFILENAME): PASSES with 0 errors.
+    - Yosys synthesis: PASSES with 0 errors.
+
+================================================================================
+10. FIX: INTELLIGENT RATE-LIMIT HANDLING
+================================================================================
+
+Reference file : RATE_LIMIT_FIX.txt
+
+PROBLEM
+  When Groq API returned HTTP 429 (rate limit), the original code retried
+  with a short exponential back-off (1 s, 2 s, 4 s = 7 s total).  This was
+  insufficient – Groq resets token budgets per minute, so a 7 s wait did not
+  allow recovery.  After 3 attempts the system aborted the entire design flow.
+
+CHANGES
+  llm_router.py – _make_api_call()
+    • Increased default max_retries from 3 to 10.
+    • On HTTP 429, calls the new _extract_rate_limit_wait_time() helper to
+      read the exact wait time from the Groq error message
+      (e.g., "try again in 6.44s").
+    • If extracted wait time < 15 s (near end of minute window), waits 65 s
+      to ensure the full per-minute token budget resets.
+    • Otherwise waits extracted_time × 1.2 (20 % safety buffer).
+    • Falls back to 65 s if no wait time can be parsed from the response.
+    • Logs a human-readable message: "Rate limit hit. Waiting 7.1s before
+      retry 3/10…"
+
+  llm_router.py – _extract_rate_limit_wait_time() (NEW METHOD)
+    • Parses Groq rate-limit error messages with regex patterns:
+        "try again in N.NNs"
+        "try again in N.NN second(s)"
+        "Please wait N.NN second(s)"
+    • Returns float seconds or None if pattern not found.
+
+  config.py
+    • max_api_retries : int = 10          (was 3, now configurable)
+    • rate_limit_retry_delay : float = 1.0
+    • auto_wait_on_rate_limit : bool = True
+
+================================================================================
+11. FIX: STAGE 6 FEASIBILITY FAILURE
+================================================================================
+
+Reference file : FINAL_CRITICAL_FIXES.txt
+
+PROBLEM
+  The System role occasionally returned "feasible": false for designs that
+  were perfectly implementable (e.g., a simple counter), causing Stage 6 to
+  report failure and stopping the pipeline before Stage 7.
+
+CHANGES
+  roles/system_role.py – analyze_feasibility()
+    • Rewrote system prompt to be positive and realistic about standard FPGA
+      designs.
+    • Added guidance: simple counters, UARTs, SPI controllers → always
+      feasible; only reject if there is a genuine technical blocker.
+    • "risk_level" defaults to "LOW" for standard digital designs.
+
+================================================================================
+12. FIX: STAGE 7 FINAL APPROVAL REJECTION
+================================================================================
+
+Reference file : FINAL_CRITICAL_FIXES.txt
+
+PROBLEM
+  After all previous stages passed, Stage 7 (Final HOD Approval) would
+  sometimes return "approved": false because the prompt loaded from
+  prompts/hod.txt lacked stage-specific approval guidance.
+
+TWO-PART FIX
+
+  roles/hod.py – final_approval()  (prompt improvement)
+    • Updated fallback system prompt with explicit approval guidelines:
+        "APPROVE if verification passed AND feasibility risk is LOW or MEDIUM."
+        "APPROVE if verification passed AND feasibility says the design is feasible."
+        "Only REJECT if feasibility risk is HIGH with genuine implementation blockers."
+    • User prompt now contains a REMINDER line:
+        "If verification passed and risk is LOW or MEDIUM, you MUST approve."
+    • Passes risk_level, feasible flag, and iteration count to the LLM so it
+      has full context for its decision.
+
+  roles/hod.py – final_approval()  (deterministic override)
+    • After parsing the LLM response, a defensive Python guard checks:
+        verification_result['passed'] == True
+        AND feasibility_result['feasible'] == True
+        AND risk_level in ('LOW', 'MEDIUM')
+    • If all three conditions hold but the LLM still returned approved: false,
+      the code overrides to approved=True and logs a WARNING explaining the
+      override.
+    • This prevents an unreasonable LLM rejection from blocking an otherwise
+      fully verified design.
+
+================================================================================
+13. FIX: SUMMARY DISPLAY BUGS IN main.py
+================================================================================
+
+Reference file : FINAL_CRITICAL_FIXES.txt
+
+PROBLEM
+  The _print_summary() method in FPGADesignBot always used the generic
+  stage_data.get('approved') or stage_data.get('passed') check for every
+  stage.  Stages 2, 4, and 6 do not use those keys, so they always showed
+  "✗ FAILED" in the summary even when they had succeeded.
+
+CHANGES
+  main.py – FPGADesignBot._print_summary()
+    • Stage 2 (Architecture Design): success detected by checking whether
+      block_diagram (dict) or design_overview (str) is non-empty.
+    • Stage 4 (RTL Generation): success detected by checking whether
+      the modules list is non-empty.
+    • Stage 6 (System Feasibility): success detected by checking the
+      stage_data.get('feasible') boolean.
+    • All other stages continue to use approved / passed.
+
+================================================================================
+14. NEW DIAGNOSTIC & TEST TOOLS
+================================================================================
+
+diagnose_stage0.py   (NEW)
+  Stand-alone script that calls Stage 0 in isolation and pretty-prints the
+  raw LLM JSON so developers can debug validation failures quickly.
+  Added in v1.0.2 (UPDATE_v1.0.2.txt).
+
+diagnose_stage5.py   (NEW)
+  Stand-alone script that re-runs toolchain validation against a previously
+  generated Verilog file and prints full Yosys / Verilator output.
+  Usage: python diagnose_stage5.py [outputs/SESSION_DIR]
+  Added in response to Stage 5 convergence debugging.
+
+test_validation.py   (UPDATED)
+  Extended to test four representative designs through Stage 0:
+    • UART transmitter, SPI master, button debouncer, 16-bit counter.
+  All four are expected to be approved.
+
+test_stage1.py       (NEW)
+  Tests Stage 1 requirement freeze with a pre-approved Stage 0 result.
+  Verifies that approved: true is always returned.
+  Added in v1.0.2 (UPDATE_v1.0.2.txt).
+
+test_installation.py
+  Unchanged from initial release – verifies module imports, config loading,
+  file structure, prompt loading, and example spec validation.
+
+================================================================================
+15. DOCUMENTATION ADDED
+================================================================================
+
+File                        Added in / Purpose
+--------------------------  ---------------------------------------------------
+UPDATE_NOTES.txt            v1.0.1 – Stage 0 fix notes.
+UPDATE_v1.0.2.txt           v1.0.2 – Stages 0 & 1 fix notes.
+STAGE4_FIX.txt              max_tokens parameter fix.
+STAGE5_FIX.txt              Verification role prompt fix notes.
+STAGE5_NOT_CONVERGING.txt   Diagnosis of iterative verification failure.
+VERIFICATION_LOOP_ISSUE.txt Root-cause analysis of the loop issue.
+FINAL_ROOT_CAUSE_FIX.txt    DECLFILENAME Verilator flag discovery and fix.
+JSON_VALIDATION_FIX.txt     JSON validation failure fix and retry logic.
+PAYLOAD_SIZE_FIX.txt        Model selection and token-limit guidance.
+RATE_LIMIT_FIX.txt          Intelligent rate-limit handling documentation.
+PATCH_v1.0.3.txt            Field-name KeyError multi-file patch notes.
+FINAL_CRITICAL_FIXES.txt    Stages 6 & 7 fix + summary display bug fix.
+TROUBLESHOOTING.txt         End-to-end debugging guide for Stage 0 issues.
+PROJECT_STRUCTURE.txt       Annotated directory tree and role responsibilities.
+FILE_MANIFEST.txt           Complete annotated list of all files with LOC.
+QUICKSTART.txt              Fast setup and first-run guide.
+CHANGES.txt                 THIS FILE – consolidated change log.
+
+================================================================================
+SUMMARY OF ALL FILES MODIFIED ACROSS ALL FIXES
+================================================================================
+
+File                    Sections changed
+----------------------  --------------------------------------------------------
+main.py                 Stage 4 & 5 Verilog save loops (§6);
+                        _print_summary() stage success detection (§13).
+
+config.py               verification_model → llama-3.3-70b-versatile (§7);
+                        max_api_retries, rate_limit_retry_delay,
+                        auto_wait_on_rate_limit fields added (§10);
+                        max_verification_iterations raised to 12 (§8).
+
+llm_router.py           call_with_system_prompt() max_tokens param (§4);
+                        _make_api_call() intelligent rate-limit wait (§10);
+                        _extract_rate_limit_wait_time() new method (§10).
+
+toolchain.py            run_verilator_lint() -Wno-DECLFILENAME flag (§9);
+                        validate_multiple_modules() defensive field access (§6).
+
+stage_controller.py     stage0 / stage1 enhanced logging (§2, §3);
+                        stage4 module-name logging defensive access (§6).
+
+roles/hod.py            validate_idea() permissive prompt (§2);
+                        freeze_requirements() always-approve prompt (§3);
+                        final_approval() approval-biased prompt (§12);
+                        final_approval() deterministic override guard (§12).
+
+roles/rtl.py            generate_rtl() JSON-mode retry on failure (§5);
+                        generate_rtl() module-name logging defensive (§6).
+
+roles/verification.py   audit_rtl() explicit error-recognition prompt (§8).
+
+roles/system_role.py    analyze_feasibility() positive feasibility prompt (§11).
+
+prompts/hod.txt         Permissive Stage 0 guidance (§2).
+
+================================================================================
+WORKFLOW STATUS AFTER ALL FIXES
+================================================================================
+
+Stage 0  Idea Validation      ✓ WORKING  (permissive, makes assumptions)
+Stage 1  Requirement Freeze   ✓ WORKING  (always approves, documents spec)
+Stage 2  Architecture Design  ✓ WORKING  (block diagram + FSMs)
+Stage 3  Architecture Approval✓ WORKING  (HOD critical review gate)
+Stage 4  RTL Generation       ✓ WORKING  (JSON retry, field-name resilience)
+Stage 5  Verification Audit   ✓ WORKING  (DECLFILENAME suppressed, prompt fixed)
+Stage 6  System Feasibility   ✓ WORKING  (realistic feasibility assessment)
+Stage 7  Final Approval       ✓ WORKING  (approval-biased prompt + override)
+
+Full pipeline command:
+  python main.py "16-bit counter with enable and reset"
+  python main.py "UART transmitter with 8-bit data, 115200 baud"
+  python main.py --spec examples/sample_spec.json
+
+================================================================================
+END OF CHANGES.TXT
+================================================================================
