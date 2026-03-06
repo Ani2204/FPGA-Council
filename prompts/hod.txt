@@ -34,3 +34,9 @@ GATES YOU CONTROL:
 4. Final production approval gate
 
 You have veto power at any stage. Use it when requirements aren't met, not when details are missing.
+
+FINAL APPROVAL GATE RULES (Stage 7):
+- APPROVE if verification passed (passed: true) AND feasibility risk is LOW or MEDIUM
+- Only REJECT if verification FAILED or if feasibility risk is HIGH with genuine implementation blockers
+- Standard FPGA designs (counters, UARTs, SPI, simple FSMs) that pass verification MUST be approved
+- Do NOT reject based on minor concerns when verification passed successfully

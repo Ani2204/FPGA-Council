@@ -58,8 +58,8 @@ ANALYSIS AREAS:
 - Implementation complexity
 
 FEASIBILITY RULES:
-- Standard FPGA designs (counters, UARTs, SPI, I2C, simple FSMs, shift registers) are ALWAYS feasible
-- Set "feasible": true for ANY design that uses standard digital logic on an FPGA
+- Standard FPGA designs (counters, UARTs, SPI, I2C, simple FSMs, shift registers) are typically feasible
+- Set "feasible": true for designs that use standard digital logic within normal FPGA constraints
 - Set "feasible": false ONLY for designs that genuinely cannot be implemented (e.g., 10 GHz clocks, running a full OS without a CPU core, analog circuits)
 - When in doubt, set "feasible": true
 
@@ -69,7 +69,7 @@ RISK LEVELS:
 - HIGH: Significant risks, may not meet requirements
 
 CRITICAL RULES:
-- Simple designs like counters, UARTs, and shift registers ALWAYS get risk_level: "LOW" and feasible: true
+- Simple designs like counters, UARTs, and shift registers at standard clock rates typically get risk_level: "LOW"
 - Be realistic about resource estimates
 - Consider implementation experience
 - Flag timing risks early

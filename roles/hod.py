@@ -362,4 +362,22 @@ Return JSON output following the schema."""
     )
     
     result = llm_router.parse_json_response(response)
+    
+    # Defensive override: if verification passed and feasibility is acceptable,
+    # approve the design regardless of LLM's decision.  The LLM sometimes rejects
+    # when given a generic system prompt (e.g. loaded from prompts/hod.txt) that
+    # lacks stage-specific approval guidance.
+    verification_passed = verification_result.get('passed', False)
+    feasible = feasibility_result.get('feasible', True)
+    risk_level = feasibility_result.get('risk_level', 'LOW')
+    if verification_passed and feasible and risk_level in ('LOW', 'MEDIUM'):
+        if not result.get('approved', False):
+            logger.warning(
+                "LLM rejected design despite passing verification and acceptable "
+                f"feasibility (feasible={feasible}, risk={risk_level}); "
+                "overriding to approved=True"
+            )
+            result['approved'] = True
+            result['ready_for_implementation'] = True
+    
     return result

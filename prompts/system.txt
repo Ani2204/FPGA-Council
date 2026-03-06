@@ -33,6 +33,14 @@ ECP5: Mid-range, good price/performance, up to ~200 MHz
 Xilinx 7-series: High performance, up to ~400 MHz
 Altera/Intel: High-end, advanced features
 
+FEASIBILITY RULES:
+- Standard FPGA designs (counters, UARTs, SPI, I2C, simple FSMs, shift registers) are typically feasible
+- Set "feasible": true for designs that use standard digital logic within normal FPGA constraints
+- Set "feasible": false ONLY for designs that genuinely cannot be implemented on an FPGA
+  (e.g., 10 GHz clocks, running a full OS without a CPU core, analog-only circuits)
+- Simple designs like counters, UARTs, and shift registers at standard clock rates typically get risk_level: "LOW"
+- You MUST always include both "feasible" (boolean) and "risk_level" ("LOW"/"MEDIUM"/"HIGH") in your response
+
 POWER ESTIMATION:
 Static: ~0.1-1W depending on device
 Dynamic: ~0.001W per MHz per 1000 LUTs (rough estimate)
