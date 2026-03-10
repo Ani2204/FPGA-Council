@@ -168,7 +168,29 @@ class FPGADesignBot:
             if not stage5_result.get("passed", False):
                 logger.error("Stage 5 failed: Verification did not pass")
                 return session_data
-            
+
+            # Stage 5b: Testbench Generation
+            logger.info("\n" + "=" * 80)
+            logger.info("STAGE 5b: Testbench Generation")
+            logger.info("=" * 80)
+            stage5b_result = self.controller.stage5b_testbench_generation(
+                stage1_result,
+                stage5_result
+            )
+            session_data["stages"]["stage5b"] = stage5b_result
+            self._save_stage_output("stage5b_testbenches.json", stage5b_result)
+
+            # Save testbench Verilog files
+            for tb in stage5b_result.get("testbenches", []):
+                tb_name = tb.get('module_name') or (tb.get('dut_module', 'unnamed_module') + '_tb')
+                tb_code = tb.get('verilog_code', '')
+                if tb_code:
+                    tb_path = self.output_dir / f"{tb_name}.v"
+                    tb_path.write_text(tb_code)
+                    logger.info(f"Saved testbench: {tb_path}")
+                else:
+                    logger.warning(f"Testbench {tb_name} has no verilog_code")
+
             # Stage 6: System Feasibility Check
             logger.info("\n" + "=" * 80)
             logger.info("STAGE 6: System Feasibility Check")
@@ -234,6 +256,7 @@ class FPGADesignBot:
             "stage3": "Architecture Approval",
             "stage4": "RTL Generation",
             "stage5": "Verification Audit",
+            "stage5b": "Testbench Generation",
             "stage6": "System Feasibility",
             "stage7": "Final Approval"
         }
@@ -241,7 +264,27 @@ class FPGADesignBot:
         for stage_key, stage_name in stage_names.items():
             if stage_key in stages:
                 stage_data = stages[stage_key]
-                status = "✓ PASSED" if stage_data.get("approved") or stage_data.get("passed") else "✗ FAILED"
+                # Determine success based on the field each stage actually populates
+                if stage_key == "stage2":
+                    # Architecture design: success if the design has meaningful content
+                    block_diagram = stage_data.get("block_diagram")
+                    design_overview = stage_data.get("design_overview")
+                    success = bool(
+                        (isinstance(block_diagram, dict) and block_diagram) or
+                        (isinstance(design_overview, str) and design_overview.strip())
+                    )
+                elif stage_key == "stage5b":
+                    # Testbench generation: success if at least one testbench was generated
+                    success = bool(stage_data.get("testbenches"))
+                elif stage_key == "stage4":
+                    # RTL generation: success if at least one module was generated
+                    success = bool(stage_data.get("modules"))
+                elif stage_key == "stage6":
+                    # System feasibility: success if the design is marked feasible
+                    success = stage_data.get("feasible", False)
+                else:
+                    success = bool(stage_data.get("approved") or stage_data.get("passed"))
+                status = "✓ PASSED" if success else "✗ FAILED"
                 print(f"  {stage_name}: {status}")
         
         # Check if design is complete

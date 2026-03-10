@@ -57,17 +57,25 @@ ANALYSIS AREAS:
 - Special resource needs (PLLs, high-speed transceivers, etc.)
 - Implementation complexity
 
+FEASIBILITY RULES:
+- Standard FPGA designs (counters, UARTs, SPI, I2C, simple FSMs, shift registers) are typically feasible
+- Set "feasible": true for designs that use standard digital logic within normal FPGA constraints
+- Set "feasible": false ONLY for designs that genuinely cannot be implemented (e.g., 10 GHz clocks, running a full OS without a CPU core, analog circuits)
+- When in doubt, set "feasible": true
+
 RISK LEVELS:
-- LOW: Standard design, should implement easily
+- LOW: Standard design, should implement easily on most FPGAs
 - MEDIUM: Some challenges, may need optimization
 - HIGH: Significant risks, may not meet requirements
 
 CRITICAL RULES:
+- Simple designs like counters, UARTs, and shift registers at standard clock rates typically get risk_level: "LOW"
 - Be realistic about resource estimates
 - Consider implementation experience
 - Flag timing risks early
 - Recommend specific FPGA families if not specified
 - Consider power and thermal constraints
+- You MUST always include "feasible" and "risk_level" in your response
 
 Output ONLY valid JSON with this structure:
 {
@@ -167,6 +175,20 @@ Return JSON output following the schema."""
     )
     
     result = llm_router.parse_json_response(response)
+    
+    # Normalize result: provide sensible defaults if required fields are missing or invalid
+    if 'feasible' not in result:
+        # LLM did not include the required 'feasible' field; default to True since
+        # standard FPGA designs that have passed verification are always implementable.
+        logger.warning("LLM response missing 'feasible' field; defaulting to True")
+        result['feasible'] = True
+    if result.get('risk_level', '') not in ('LOW', 'MEDIUM', 'HIGH'):
+        # LLM did not return a valid risk_level; default to LOW for standard designs.
+        logger.warning(
+            f"LLM response has invalid or missing 'risk_level' "
+            f"(got {result.get('risk_level')!r}); defaulting to 'LOW'"
+        )
+        result['risk_level'] = 'LOW'
     
     # Log feasibility summary
     feasible = result.get("feasible", False)

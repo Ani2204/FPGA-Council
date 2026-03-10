@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 from config import Config
 from llm_router import LLMRouter
 from toolchain import ToolchainValidator
-from roles import hod, architecture, rtl, verification, system_role
+from roles import hod, architecture, rtl, verification, system_role, testbench
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +264,40 @@ class StageController:
         
         return result
     
+    def stage5b_testbench_generation(
+        self,
+        requirements: Dict[str, Any],
+        verification_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Stage 5b: Generate self-checking Verilog testbenches for verified RTL modules
+
+        Args:
+            requirements: Frozen requirements from Stage 1
+            verification_result: Verification result from Stage 5 (contains final_modules)
+
+        Returns:
+            Dict with 'testbenches' list and 'simulation_notes' string
+        """
+        logger.info("Executing Stage 5b: Testbench Generation")
+
+        verified_modules = verification_result.get("final_modules", [])
+        logger.info(f"Generating testbenches for {len(verified_modules)} module(s)")
+
+        result = testbench.generate_testbench(
+            self.llm,
+            requirements,
+            verified_modules
+        )
+
+        tbs = result.get("testbenches", [])
+        logger.info(f"Stage 5b complete. Generated {len(tbs)} testbench(es).")
+        for tb in tbs:
+            tb_name = tb.get('module_name') or (tb.get('dut_module', 'unknown') + '_tb')
+            logger.info(f"  - {tb_name}")
+
+        return result
+
     def stage6_system_feasibility(
         self,
         requirements: Dict[str, Any],
