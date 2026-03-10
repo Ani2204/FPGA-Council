@@ -24,6 +24,7 @@ class Config:
     rtl_model: str = "llama-3.3-70b-versatile"
     verification_model: str = "llama-3.3-70b-versatile"
     system_model: str = "llama-3.3-70b-versatile"
+    testbench_model: str = "llama-3.3-70b-versatile"
     
     # Model Parameters
     temperature: float = 0.1  # Low temperature for deterministic outputs
@@ -88,7 +89,8 @@ class Config:
             "architecture": self.architecture_model,
             "rtl": self.rtl_model,
             "verification": self.verification_model,
-            "system": self.system_model
+            "system": self.system_model,
+            "testbench": self.testbench_model
         }
         return role_models.get(role.lower(), self.hod_model)
     

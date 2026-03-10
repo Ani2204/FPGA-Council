@@ -8,5 +8,6 @@ from . import architecture
 from . import rtl
 from . import verification
 from . import system_role
+from . import testbench
 
-__all__ = ['hod', 'architecture', 'rtl', 'verification', 'system_role']
+__all__ = ['hod', 'architecture', 'rtl', 'verification', 'system_role', 'testbench']
